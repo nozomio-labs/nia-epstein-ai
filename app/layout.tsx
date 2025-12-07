@@ -15,17 +15,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Paul Graham Agent",
-  description: "Ask Paul Graham anything — an AI agent grounded in 120+ essays, powered by Nia",
+  title: "Naval Agent",
+  description: "Ask Naval Ravikant anything — an AI agent grounded in his wisdom on wealth, happiness, and life, powered by Nia",
   openGraph: {
-    title: "Paul Graham Agent",
-    description: "Ask Paul Graham anything — an AI agent grounded in 120+ essays, powered by Nia",
+    title: "Naval Agent",
+    description: "Ask Naval Ravikant anything — an AI agent grounded in his wisdom on wealth, happiness, and life, powered by Nia",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Paul Graham Agent",
-    description: "Ask Paul Graham anything — an AI agent grounded in 120+ essays, powered by Nia",
+    title: "Naval Agent",
+    description: "Ask Naval Ravikant anything — an AI agent grounded in his wisdom on wealth, happiness, and life, powered by Nia",
   },
   viewport: {
     width: "device-width",

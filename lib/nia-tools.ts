@@ -45,19 +45,19 @@ async function niaFetch(
 }
 
 function getSourceId(): string {
-  const sourceId = process.env.PAUL_GRAHAM_NIA_SOURCE;
+  const sourceId = process.env.NAVAL_NIA_SOURCE;
   if (!sourceId) {
-    throw new Error("PAUL_GRAHAM_NIA_SOURCE environment variable is not set");
+    throw new Error("NAVAL_NIA_SOURCE environment variable is not set");
   }
   return sourceId;
 }
 
 /**
- * Semantic search over Paul Graham's essays
+ * Semantic search over Naval Ravikant's content
  */
 export const searchEssays = tool({
   description:
-    "Search Paul Graham's essays using semantic search. Use this to find essays related to a topic or concept. Returns relevant chunks with context.",
+    "Search Naval Ravikant's content using semantic search. Use this to find tweets, essays, podcast transcripts, and interviews related to a topic or concept. Returns relevant chunks with context.",
   inputSchema: z.object({
     query: z
       .string()
@@ -91,11 +91,11 @@ export const searchEssays = tool({
 });
 
 /**
- * Get the tree structure of all Paul Graham essays
+ * Get the tree structure of all Naval Ravikant content
  */
 export const browseEssays = tool({
   description:
-    "Get the complete tree structure of all Paul Graham essays. Use this to see what essays are available and how they're organized.",
+    "Get the complete tree structure of all Naval Ravikant content. Use this to see what content is available and how it's organized.",
   inputSchema: z.object({}),
   execute: async () => {
     log.tool("browseEssays", {});
@@ -121,11 +121,11 @@ export const browseEssays = tool({
 });
 
 /**
- * List essays in a virtual directory
+ * List content in a virtual directory
  */
 export const listDirectory = tool({
   description:
-    "List Paul Graham essays in a specific virtual directory path. Use this to explore essays at a particular location in the tree structure.",
+    "List Naval Ravikant content in a specific virtual directory path. Use this to explore content at a particular location in the tree structure.",
   inputSchema: z.object({
     path: z
       .string()
@@ -162,11 +162,11 @@ export const listDirectory = tool({
 });
 
 /**
- * Read the full content of a Paul Graham essay
+ * Read the full content of Naval Ravikant content
  */
 export const readEssay = tool({
   description:
-    "Read the full content of a specific Paul Graham essay by its virtual path. Use this to get the complete text of an essay after finding it via search or browse.",
+    "Read the full content of specific Naval Ravikant content by its virtual path. Use this to get the complete text after finding it via search or browse.",
   inputSchema: z.object({
     path: z
       .string()
@@ -202,11 +202,11 @@ export const readEssay = tool({
 });
 
 /**
- * Search essays using regex pattern
+ * Search content using regex pattern
  */
 export const grepEssays = tool({
   description:
-    "Search Paul Graham's essays using a regex pattern. Use this to find specific phrases, quotes, or text patterns across all essays. Supports case sensitivity, whole word matching, and context lines.",
+    "Search Naval Ravikant's content using a regex pattern. Use this to find specific phrases, quotes, or text patterns across all content. Supports case sensitivity, whole word matching, and context lines.",
   inputSchema: z.object({
     pattern: z
       .string()
@@ -327,7 +327,7 @@ export const grepEssays = tool({
  */
 export const webSearch = tool({
   description:
-    "Search the web for information not available in Paul Graham's essays. Use this sparingly, only for recent events or external context.",
+    "Search the web for information not available in Naval Ravikant's indexed content. Use this sparingly, only for recent events or external context.",
   inputSchema: z.object({
     query: z.string().describe("Search query"),
     numResults: z
@@ -415,7 +415,7 @@ export const getSourceContent = tool({
 });
 
 // Export all tools as a single object for easy use
-export const niaPaulGrahamTools = {
+export const niaNavalTools = {
   searchEssays,
   browseEssays,
   listDirectory,

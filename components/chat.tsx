@@ -4,9 +4,10 @@ import { useChat } from "@ai-sdk/react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ModelSelector } from "@/components/model-selector";
-import { ArrowUpIcon, PlusIcon, SearchIcon, BookOpenIcon, FileTextIcon, GlobeIcon } from "lucide-react";
+import { ArrowUpIcon, PlusIcon, SearchIcon, BookOpenIcon, FileTextIcon, GlobeIcon, CopyIcon, CheckIcon, ThumbsUpIcon, ThumbsDownIcon } from "lucide-react";
 import Image from "next/image";
 import { useState, useEffect, useRef, useCallback } from "react";
+import type { UIMessage } from "@ai-sdk/react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -69,13 +70,79 @@ function ToolInvocation({ toolType, toolName, state, input }: {
   );
 }
 
+function MessageActions({ message, feedback, onFeedback }: { 
+  message: UIMessage;
+  feedback: "like" | "dislike" | null;
+  onFeedback: (type: "like" | "dislike") => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const getTextContent = () => {
+    return message.parts
+      .filter((part) => part.type === "text")
+      .map((part) => (part as { type: "text"; text: string }).text)
+      .join("\n");
+  };
+
+  const handleCopy = async () => {
+    const text = getTextContent();
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+      <button
+        onClick={handleCopy}
+        className="p-1.5 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors"
+        title="Copy"
+      >
+        {copied ? <CheckIcon className="h-3.5 w-3.5 text-green-500" /> : <CopyIcon className="h-3.5 w-3.5" />}
+      </button>
+      <button
+        onClick={() => onFeedback("like")}
+        className={cn(
+          "p-1.5 rounded-md transition-colors",
+          feedback === "like" 
+            ? "text-green-500 bg-green-500/10" 
+            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50"
+        )}
+        title="Good response"
+      >
+        <ThumbsUpIcon className="h-3.5 w-3.5" />
+      </button>
+      <button
+        onClick={() => onFeedback("dislike")}
+        className={cn(
+          "p-1.5 rounded-md transition-colors",
+          feedback === "dislike" 
+            ? "text-red-500 bg-red-500/10" 
+            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50"
+        )}
+        title="Bad response"
+      >
+        <ThumbsDownIcon className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
 export function Chat() {
   const [input, setInput] = useState("");
   const [selectedModel, setSelectedModel] = useState<SupportedModel>(DEFAULT_MODEL);
+  const [feedbacks, setFeedbacks] = useState<Record<string, "like" | "dislike" | null>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { messages, error, sendMessage, regenerate, setMessages, stop, status } = useChat();
+
+  const handleFeedback = (messageId: string, type: "like" | "dislike") => {
+    setFeedbacks((prev) => ({
+      ...prev,
+      [messageId]: prev[messageId] === type ? null : type,
+    }));
+  };
 
   const hasMessages = messages.length > 0;
 
@@ -134,8 +201,8 @@ export function Chat() {
             <div className="space-y-3 md:space-y-4">
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 animate-slide-up">
                 <Image
-                  src="/pg.png"
-                  alt="Paul Graham"
+                  src="/naval.png"
+                  alt="Naval Ravikant"
                   width={128}
                   height={128}
                   className="rounded-full shadow-lg w-14 h-14 md:w-16 md:h-16 object-cover"
@@ -144,12 +211,12 @@ export function Chat() {
                 />
                 <h1 className="text-2xl sm:text-3xl md:text-5xl font-light tracking-tight text-foreground">
                   <span className="font-serif font-semibold tracking-tight">
-                    Paul Graham Agent
+                    Naval Agent
                   </span>
                 </h1>
               </div>
               <p className="text-muted-foreground text-sm md:text-base animate-slide-up px-2" style={{ animationDelay: '50ms' }}>
-                Ask questions about startups, writing, technology, and life — grounded in 120+ essays. Powered by{" "}
+                Ask questions about wealth, happiness, and life — grounded in Naval&apos;s wisdom. Powered by{" "}
                 <a
                   href="https://trynia.ai"
                   target="_blank"
@@ -167,7 +234,7 @@ export function Chat() {
                   <textarea
                     ref={textareaRef}
                     name="prompt"
-                    placeholder="What makes a good startup idea?"
+                    placeholder="How do I get rich without getting lucky?"
                     onChange={(e) => setInput(e.target.value)}
                     value={input}
                     autoFocus
@@ -202,35 +269,35 @@ export function Chat() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3 text-xs md:text-sm animate-slide-up" style={{ animationDelay: '150ms' }}>
               <button
                 onClick={() => {
-                  setInput("What is Collison installation?");
+                  setInput("What is specific knowledge and how do I find mine?");
                 }}
                 className="p-3 rounded-xl text-left text-muted-foreground hover:text-foreground active:bg-muted/70 hover:bg-muted/50 transition-colors"
               >
-                &ldquo;What is Collison installation?&rdquo;
+                &ldquo;What is specific knowledge?&rdquo;
               </button>
               <button
                 onClick={() => {
-                  setInput("In the essay about schlep blindness, what example does PG give about Stripe and why most hackers avoided building it?");
+                  setInput("What does Naval say about happiness being a choice or skill that can be learned?");
                 }}
                 className="p-3 rounded-xl text-left text-muted-foreground hover:text-foreground active:bg-muted/70 hover:bg-muted/50 transition-colors"
               >
-                &ldquo;Why did hackers avoid building Stripe?&rdquo;
+                &ldquo;Is happiness a skill?&rdquo;
               </button>
               <button
                 onClick={() => {
-                  setInput("What exactly does PG mean by ramen profitable and what specific advice does he give about when to take outside funding vs bootstrap?");
+                  setInput("Explain Naval's concept of leverage - the different types and how to use them to build wealth.");
                 }}
                 className="p-3 rounded-xl text-left text-muted-foreground hover:text-foreground active:bg-muted/70 hover:bg-muted/50 transition-colors"
               >
-                &ldquo;When to bootstrap vs take funding?&rdquo;
+                &ldquo;What are the types of leverage?&rdquo;
               </button>
               <button
                 onClick={() => {
-                  setInput("In the default alive or default dead essay, what is the exact calculation PG describes to determine which category your startup falls into?");
+                  setInput("What does Naval say about the difference between seeking wealth vs seeking money vs seeking status?");
                 }}
                 className="p-3 rounded-xl text-left text-muted-foreground hover:text-foreground active:bg-muted/70 hover:bg-muted/50 transition-colors"
               >
-                &ldquo;How to calculate default alive?&rdquo;
+                &ldquo;Wealth vs money vs status?&rdquo;
               </button>
             </div>
           </div>
@@ -245,6 +312,7 @@ export function Chat() {
                 <div
                   key={m.id}
                   className={cn(
+                    "group",
                     m.role === "user" &&
                       "bg-foreground text-background rounded-2xl p-3 md:p-4 ml-auto max-w-[90%] md:max-w-[75%] shadow-border-small font-medium text-sm md:text-base",
                     m.role === "assistant" && "max-w-[95%] md:max-w-[85%] text-foreground/90 leading-relaxed text-sm md:text-base"
@@ -277,6 +345,13 @@ export function Chat() {
                         return null;
                     }
                   })}
+                  {m.role === "assistant" && status !== "streaming" && (
+                    <MessageActions 
+                      message={m} 
+                      feedback={feedbacks[m.id] || null}
+                      onFeedback={(type) => handleFeedback(m.id, type)}
+                    />
+                  )}
                 </div>
               ))}
 
