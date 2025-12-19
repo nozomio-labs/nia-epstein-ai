@@ -4,7 +4,22 @@ import { useChat } from "@ai-sdk/react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ModelSelector } from "@/components/model-selector";
-import { ArrowUpIcon, PlusIcon, SearchIcon, BookOpenIcon, FileTextIcon, GlobeIcon, CopyIcon, CheckIcon, ThumbsUpIcon, ThumbsDownIcon, GithubIcon } from "lucide-react";
+import {
+  ArrowUpIcon,
+  PlusIcon,
+  SearchIcon,
+  BookOpenIcon,
+  FileTextIcon,
+  GlobeIcon,
+  CopyIcon,
+  CheckIcon,
+  ThumbsUpIcon,
+  ThumbsDownIcon,
+  GithubIcon,
+  FolderIcon,
+  FolderTreeIcon,
+  CodeIcon,
+} from "lucide-react";
 import Image from "next/image";
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { UIMessage } from "@ai-sdk/react";
@@ -13,22 +28,27 @@ import { AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Streamdown } from "streamdown";
 import { DEFAULT_MODEL, type SupportedModel } from "@/lib/constants";
+import { FlickeringGrid } from "@/components/ui/flickering-grid";
 
 const toolIcons: Record<string, React.ReactNode> = {
-  searchEssays: <SearchIcon className="h-3 w-3" />,
-  browseEssays: <BookOpenIcon className="h-3 w-3" />,
-  listDirectory: <FileTextIcon className="h-3 w-3" />,
-  readEssay: <FileTextIcon className="h-3 w-3" />,
-  grepEssays: <SearchIcon className="h-3 w-3" />,
+  searchChromium: <SearchIcon className="h-3 w-3" />,
+  browseChromiumDocs: <FolderTreeIcon className="h-3 w-3" />,
+  listChromiumDocsDirectory: <FolderIcon className="h-3 w-3" />,
+  readChromiumDoc: <FileTextIcon className="h-3 w-3" />,
+  grepChromiumDocs: <SearchIcon className="h-3 w-3" />,
+  grepChromiumCode: <CodeIcon className="h-3 w-3" />,
+  getSourceContent: <FileTextIcon className="h-3 w-3" />,
   webSearch: <GlobeIcon className="h-3 w-3" />,
 };
 
 const toolDisplayNames: Record<string, string> = {
-  searchEssays: "Searching essays",
-  browseEssays: "Browsing essays",
-  listDirectory: "Listing directory",
-  readEssay: "Reading essay",
-  grepEssays: "Pattern search",
+  searchChromium: "Searching Chromium",
+  browseChromiumDocs: "Browsing docs tree",
+  listChromiumDocsDirectory: "Listing directory",
+  readChromiumDoc: "Reading document",
+  grepChromiumDocs: "Pattern search docs",
+  grepChromiumCode: "Grep codebase",
+  getSourceContent: "Opening source",
   webSearch: "Web search",
 };
 
@@ -38,7 +58,7 @@ function ToolInvocation({ toolType, toolName, state, input }: {
   state?: string;
   input?: unknown;
 }) {
-  // Extract tool name from type (e.g., "tool-searchEssays" -> "searchEssays")
+  // Extract tool name from type (e.g., "tool-searchChromium" -> "searchChromium")
   const resolvedToolName = toolName || toolType.replace("tool-", "");
   const displayName = toolDisplayNames[resolvedToolName] || resolvedToolName;
   const defaultIcon = <SearchIcon className="h-3 w-3" />;
@@ -183,7 +203,15 @@ export function Chat() {
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] overflow-hidden">
+    <div className="relative flex flex-col h-[100dvh] overflow-hidden">
+      <FlickeringGrid
+        className="absolute inset-0 z-0 pointer-events-none [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]"
+        squareSize={4}
+        gridGap={6}
+        color="rgb(74, 144, 226)"
+        maxOpacity={0.15}
+        flickerChance={0.1}
+      />
       <div className="absolute top-3 left-3 md:top-4 md:left-4 z-10 flex gap-2 animate-fade-in safe-area-top">
         <Button
           onClick={handleNewChat}
@@ -200,10 +228,10 @@ export function Chat() {
           className="h-10 w-10 md:h-9 md:w-9 shadow-border-small hover:shadow-border-medium bg-background/80 backdrop-blur-sm border-0 hover:bg-background active:scale-95 md:hover:scale-[1.02] transition-all duration-150 ease"
         >
           <a
-            href="https://github.com/nozomio-labs/naval-ai"
+            href="https://github.com/chromium/chromium"
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="GitHub repository"
+            aria-label="Chromium repository"
           >
             <GithubIcon className="h-4 w-4" />
           </a>
@@ -216,22 +244,28 @@ export function Chat() {
             <div className="space-y-3 md:space-y-4">
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 animate-slide-up">
                 <Image
-                  src="/naval.png"
-                  alt="Naval Ravikant"
+                  src="/chromium.png"
+                  alt="Chromium"
                   width={128}
                   height={128}
-                  className="rounded-full shadow-lg w-14 h-14 md:w-16 md:h-16 object-cover"
+                  className="rounded-2xl shadow-lg w-14 h-14 md:w-16 md:h-16 object-contain bg-background/70 backdrop-blur-sm border border-border/50"
                   priority
                   quality={100}
                 />
-                <h1 className="text-2xl sm:text-3xl md:text-5xl font-light tracking-tight text-foreground">
-                  <span className="font-serif font-semibold tracking-tight">
-                    Naval Agent
-                  </span>
+                <h1 className="text-2xl sm:text-3xl md:text-5xl tracking-tight text-foreground font-[family-name:var(--font-canela)]">
+                  ChromAgent
                 </h1>
+                <div className="relative group">
+                  <span className="text-[10px] text-muted-foreground/60 cursor-default">35 sources</span>
+                  <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-64 p-2 rounded-lg bg-popover border border-border shadow-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50 text-left">
+                    <p className="text-[10px] text-muted-foreground leading-relaxed">
+                      <span className="text-foreground/80">2 docs</span> + <span className="text-foreground/80">33 code subtrees</span>: base, net, content, chrome, components, ui, gpu, mojo, services, cc, storage, extensions...
+                    </p>
+                  </div>
+                </div>
               </div>
               <p className="text-muted-foreground text-sm md:text-base animate-slide-up px-2" style={{ animationDelay: '50ms' }}>
-                Ask questions about wealth, happiness, and life — grounded in Naval&apos;s wisdom. Powered by{" "}
+                Ask about Chromium&apos;s codebase and docs — grounded in indexed sources. Powered by{" "}
                 <a
                   href="https://trynia.ai"
                   target="_blank"
@@ -240,7 +274,16 @@ export function Chat() {
                 >
                   Nia
                 </a>
-                .
+                . Use{" "}
+                <a
+                  href="https://trynia.ai"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-4 hover:text-foreground transition-colors"
+                >
+                  Nia MCP
+                </a>
+                {" "}to add this to your coding agent.
               </p>
             </div>
             <div className="w-full animate-slide-up" style={{ animationDelay: '100ms' }}>
@@ -249,7 +292,7 @@ export function Chat() {
                   <textarea
                     ref={textareaRef}
                     name="prompt"
-                    placeholder="How do I get rich without getting lucky?"
+                    placeholder="Where is the network stack implemented (net/ vs services/network/)?"
                     onChange={(e) => setInput(e.target.value)}
                     value={input}
                     autoFocus
@@ -270,7 +313,7 @@ export function Chat() {
                       className={cn(
                         "h-8 w-8 rounded-lg transition-all duration-200",
                         input.trim() 
-                          ? "bg-foreground text-background hover:bg-foreground/90 shadow-sm" 
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm" 
                           : "bg-muted text-muted-foreground cursor-not-allowed"
                       )}
                       disabled={!input.trim()}
@@ -284,35 +327,35 @@ export function Chat() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3 text-xs md:text-sm animate-slide-up" style={{ animationDelay: '150ms' }}>
               <button
                 onClick={() => {
-                  setInput("What is specific knowledge and how do I find mine?");
+                  setInput("How do I add a new command-line switch (where are flags defined and parsed)?");
                 }}
                 className="p-3 rounded-xl text-left text-muted-foreground hover:text-foreground active:bg-muted/70 hover:bg-muted/50 transition-colors"
               >
-                &ldquo;What is specific knowledge?&rdquo;
+                &ldquo;How do I add a new command-line switch?&rdquo;
               </button>
               <button
                 onClick={() => {
-                  setInput("What does Naval say about happiness being a choice or skill that can be learned?");
+                  setInput("Where should a new feature flag live (base/feature_list.h vs content/)?");
                 }}
                 className="p-3 rounded-xl text-left text-muted-foreground hover:text-foreground active:bg-muted/70 hover:bg-muted/50 transition-colors"
               >
-                &ldquo;Is happiness a skill?&rdquo;
+                &ldquo;Where do feature flags live?&rdquo;
               </button>
               <button
                 onClick={() => {
-                  setInput("Explain Naval's concept of leverage - the different types and how to use them to build wealth.");
+                  setInput("What is the high-level process model (browser, renderer, GPU) and where is it documented?");
                 }}
                 className="p-3 rounded-xl text-left text-muted-foreground hover:text-foreground active:bg-muted/70 hover:bg-muted/50 transition-colors"
               >
-                &ldquo;What are the types of leverage?&rdquo;
+                &ldquo;Chromium process model overview?&rdquo;
               </button>
               <button
                 onClick={() => {
-                  setInput("What does Naval say about the difference between seeking wealth vs seeking money vs seeking status?");
+                  setInput("Given an error stack, how can I trace it to the owning component (example: net::ERR_*)?");
                 }}
                 className="p-3 rounded-xl text-left text-muted-foreground hover:text-foreground active:bg-muted/70 hover:bg-muted/50 transition-colors"
               >
-                &ldquo;Wealth vs money vs status?&rdquo;
+                &ldquo;How do I trace net::ERR_* errors?&rdquo;
               </button>
             </div>
           </div>
@@ -329,7 +372,7 @@ export function Chat() {
                   className={cn(
                     "group",
                     m.role === "user" &&
-                      "bg-foreground text-background rounded-2xl p-3 md:p-4 ml-auto max-w-[90%] md:max-w-[75%] shadow-border-small font-medium text-sm md:text-base",
+                      "bg-primary text-primary-foreground rounded-2xl p-3 md:p-4 ml-auto max-w-[90%] md:max-w-[75%] shadow-border-small font-medium text-sm md:text-base",
                     m.role === "assistant" && "max-w-[95%] md:max-w-[85%] text-foreground/90 leading-relaxed text-sm md:text-base"
                   )}
                 >
@@ -368,9 +411,9 @@ export function Chat() {
                       onFeedback={(type) => handleFeedback(m.id, type)}
                     />
                     <div className="mt-3 pt-3 border-t border-border/40 flex items-start gap-2 text-xs text-muted-foreground/70">
-                       <div className="mt-1 w-1.5 h-1.5 rounded-full bg-black dark:bg-white shrink-0" />
+                       <div className="mt-1 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
                        <span>
-                         To reduce code hallucinations or give more reliable context to your coding agents, try <a href="https://trynia.ai" target="_blank" rel="noopener noreferrer" className="font-medium text-blue-500 hover:underline transition-all">Nia</a>.
+                         Grounded answers come from your indexed Chromium sources via <a href="https://trynia.ai" target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline transition-all">Nia</a>.
                        </span>
                     </div>
                     </>
@@ -432,7 +475,7 @@ export function Chat() {
                   className={cn(
                     "h-8 w-8 rounded-lg transition-all duration-200",
                     input.trim() 
-                      ? "bg-foreground text-background hover:bg-foreground/90 shadow-sm" 
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm" 
                       : "bg-muted text-muted-foreground cursor-not-allowed"
                   )}
                   disabled={!input.trim()}
@@ -467,9 +510,6 @@ export function Chat() {
               Nozomio Labs
             </a>
             )
-          </p>
-          <p className="text-xs text-muted-foreground/60 mt-1">
-            Arlan Rakhmetzhanov Production
           </p>
         </footer>
       )}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
 
@@ -14,18 +15,24 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const canela = localFont({
+  src: "../public/fonts/Canela-Regular-Trial.otf",
+  variable: "--font-canela",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "Naval Agent",
-  description: "Ask Naval Ravikant anything — an AI agent grounded in his wisdom on wealth, happiness, and life, powered by Nia",
+  title: "ChromAgent",
+  description: "Ask Chromium anything — an AI agent grounded in your indexed Chromium repository + documentation, powered by Nia",
   openGraph: {
-    title: "Naval Agent",
-    description: "Ask Naval Ravikant anything — an AI agent grounded in his wisdom on wealth, happiness, and life, powered by Nia",
+    title: "ChromAgent",
+    description: "Ask Chromium anything — an AI agent grounded in your indexed Chromium repository + documentation, powered by Nia",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Naval Agent",
-    description: "Ask Naval Ravikant anything — an AI agent grounded in his wisdom on wealth, happiness, and life, powered by Nia",
+    title: "ChromAgent",
+    description: "Ask Chromium anything — an AI agent grounded in your indexed Chromium repository + documentation, powered by Nia",
   },
   viewport: {
     width: "device-width",
@@ -44,7 +51,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${canela.variable} antialiased`}
       >
         <ThemeProvider
           attribute="class"
