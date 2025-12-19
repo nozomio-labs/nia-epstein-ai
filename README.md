@@ -1,6 +1,6 @@
-# Naval AI Agent
+# ChromAgent (Chromium AI Agent)
 
-AI agent that answers questions grounded in Naval Ravikant's wisdom on wealth, happiness, and life. Powered by [Nia](https://trynia.ai).
+AI agent that answers questions grounded in your indexed **Chromium repository + documentation**. Powered by [Nia](https://trynia.ai).
 
 ## Quick Start
 
@@ -8,7 +8,7 @@ AI agent that answers questions grounded in Naval Ravikant's wisdom on wealth, h
 2. Copy `.env.example` to `.env` and fill in:
    - `NIA_API_KEY` - Get from [trynia.ai](https://trynia.ai)
    - `AI_GATEWAY_API_KEY` - Your AI provider key
-   - `NAVAL_NIA_SOURCE` - Add Naval Ravikant content from [/explore](https://trynia.ai/explore) pre-indexed sources
+   - `CHROMIUM_NIA_SOURCES` - Comma-separated Nia data source IDs for your Chromium repo/docs (from [/explore](https://trynia.ai/explore))
 3. Install & run:
    ```bash
    bun install
@@ -18,5 +18,5 @@ AI agent that answers questions grounded in Naval Ravikant's wisdom on wealth, h
 ## Docs
 
 [docs.trynia.ai](https://docs.trynia.ai)
-# naval-ai
-# naval-ai
+
+# chromium-agent-nia
