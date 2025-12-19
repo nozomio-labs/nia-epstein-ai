@@ -93,43 +93,6 @@ function getDefaultDocSourceId(): string {
   return docs[0]!;
 }
 
-/**
- * Available Chromium subtrees and what they contain
- */
-const CHROMIUM_SUBTREE_HINTS: Record<string, string> = {
-  base: "Core utilities, threading, memory, strings, files, time, logging, command-line parsing",
-  net: "Networking stack, HTTP, sockets, DNS, certificates, cookies, proxies",
-  content: "Multi-process architecture, RenderFrame, RenderView, browser/renderer split",
-  chrome: "Chrome browser UI, settings, extensions integration, about:flags",
-  components: "Shared components (autofill, sync, safe_browsing, etc)",
-  ui: "UI toolkit, views, gfx, compositor, accessibility",
-  gpu: "GPU process, command buffer, ANGLE, Skia GPU backend",
-  mojo: "IPC system, mojom interfaces, bindings",
-  ipc: "Legacy IPC (prefer mojo for new code)",
-  services: "Service-based architecture, network service, device service",
-  extensions: "Extension APIs, manifest, permissions",
-  storage: "IndexedDB, localStorage, quota management",
-  cc: "Compositor (cc = Chrome Compositor), layers, tiles, animation",
-  ash: "ChromeOS system UI shell",
-  chromeos: "ChromeOS-specific code",
-  android_webview: "WebView for Android",
-  ios: "iOS-specific browser code",
-  headless: "Headless Chrome",
-  pdf: "PDF viewer",
-  printing: "Print preview, print backend",
-  skia: "Skia graphics library integration",
-  gin: "V8 bindings helper",
-  device: "Device APIs (USB, Bluetooth, sensors)",
-  dbus: "D-Bus (Linux IPC)",
-  remoting: "Chrome Remote Desktop",
-  fuchsia_web: "Fuchsia platform support",
-  google_apis: "Google API integrations",
-  url: "URL parsing (GURL)",
-  docs: "In-tree documentation",
-  apps: "Chrome Apps (deprecated)",
-  agents: "Agent-based features",
-  codelabs: "Example code and tutorials",
-};
 
 /**
  * Semantic search over Chromium codebase + documentation

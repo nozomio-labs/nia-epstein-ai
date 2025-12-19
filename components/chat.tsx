@@ -8,7 +8,6 @@ import {
   ArrowUpIcon,
   PlusIcon,
   SearchIcon,
-  BookOpenIcon,
   FileTextIcon,
   GlobeIcon,
   CopyIcon,
