@@ -393,23 +393,28 @@ export const grepChromiumDocs = tool({
     highlight 
   }) => {
     const resolvedSourceId = sourceId || getDefaultDocSourceId();
-    log.tool("grepChromiumDocs", { pattern, path, sourceId: resolvedSourceId, contextLines, linesAfter, linesBefore, caseSensitive, wholeWord, fixedString, outputMode });
+    log.tool("grepChromiumDocs", { pattern, path, sourceId: resolvedSourceId, outputMode });
+    
+    // Build request body, only including defined values
+    const requestBody: Record<string, unknown> = {
+      pattern,
+      context_lines: contextLines ?? 3,
+    };
+    
+    if (path && path !== "/") requestBody.path = path;
+    if (linesAfter !== undefined) requestBody.A = linesAfter;
+    if (linesBefore !== undefined) requestBody.B = linesBefore;
+    if (caseSensitive !== undefined) requestBody.case_sensitive = caseSensitive;
+    if (wholeWord !== undefined) requestBody.whole_word = wholeWord;
+    if (fixedString !== undefined) requestBody.fixed_string = fixedString;
+    if (maxMatchesPerFile !== undefined) requestBody.max_matches_per_file = maxMatchesPerFile;
+    if (maxTotalMatches !== undefined) requestBody.max_total_matches = maxTotalMatches;
+    if (outputMode) requestBody.output_mode = outputMode;
+    if (highlight !== undefined) requestBody.highlight = highlight;
+    
     const response = await niaFetch(`/data-sources/${resolvedSourceId}/grep`, {
       method: "POST",
-      body: JSON.stringify({
-        pattern,
-        path,
-        context_lines: contextLines ?? 3,
-        A: linesAfter,
-        B: linesBefore,
-        case_sensitive: caseSensitive,
-        whole_word: wholeWord,
-        fixed_string: fixedString,
-        max_matches_per_file: maxMatchesPerFile,
-        max_total_matches: maxTotalMatches,
-        output_mode: outputMode,
-        highlight,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -546,26 +551,32 @@ export const grepChromiumCode = tool({
       throw new Error(`Subtree '${resolvedSubtree}' not found. Available: ${availableSubtrees}`);
     }
 
-    log.tool("grepChromiumCode", { pattern, subtree: resolvedSubtree, repoId, path, exhaustive, outputMode });
+    log.tool("grepChromiumCode", { pattern, subtree: resolvedSubtree, path, exhaustive, outputMode });
+    
+    // Build request body, only including defined values
+    const requestBody: Record<string, unknown> = {
+      pattern,
+      context_lines: contextLines ?? 3,
+    };
+    
+    // Only add optional fields if they have values
+    if (path) requestBody.path = path;
+    if (linesAfter !== undefined) requestBody.A = linesAfter;
+    if (linesBefore !== undefined) requestBody.B = linesBefore;
+    if (caseSensitive !== undefined) requestBody.case_sensitive = caseSensitive;
+    if (wholeWord !== undefined) requestBody.whole_word = wholeWord;
+    if (fixedString !== undefined) requestBody.fixed_string = fixedString;
+    if (maxMatchesPerFile !== undefined) requestBody.max_matches_per_file = maxMatchesPerFile;
+    if (maxTotalMatches !== undefined) requestBody.max_total_matches = maxTotalMatches;
+    if (outputMode) requestBody.output_mode = outputMode;
+    if (highlight !== undefined) requestBody.highlight = highlight;
+    if (includeLineNumbers !== undefined) requestBody.include_line_numbers = includeLineNumbers;
+    if (groupByFile !== undefined) requestBody.group_by_file = groupByFile;
+    if (exhaustive !== undefined) requestBody.exhaustive = exhaustive;
+    
     const response = await niaFetch(`/repositories/${encodeURIComponent(repoId)}/grep`, {
       method: "POST",
-      body: JSON.stringify({
-        pattern,
-        path,
-        context_lines: contextLines ?? 3,
-        A: linesAfter,
-        B: linesBefore,
-        case_sensitive: caseSensitive,
-        whole_word: wholeWord,
-        fixed_string: fixedString,
-        max_matches_per_file: maxMatchesPerFile,
-        max_total_matches: maxTotalMatches,
-        output_mode: outputMode,
-        highlight,
-        include_line_numbers: includeLineNumbers,
-        group_by_file: groupByFile,
-        exhaustive,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {

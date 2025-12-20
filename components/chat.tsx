@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { Streamdown } from "streamdown";
 import { DEFAULT_MODEL, type SupportedModel } from "@/lib/constants";
 import { FlickeringGrid } from "@/components/ui/flickering-grid";
+import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
 
 const toolIcons: Record<string, React.ReactNode> = {
   searchChromium: <SearchIcon className="h-3 w-3" />,
@@ -377,6 +378,16 @@ export function Chat() {
                 >
                   {m.parts.map((part, i) => {
                     switch (part.type) {
+                      case "reasoning":
+                        return (
+                          <Reasoning 
+                            key={`${m.id}-${i}`}
+                            isStreaming={part.state === "streaming"}
+                          >
+                            <ReasoningTrigger />
+                            <ReasoningContent>{part.text}</ReasoningContent>
+                          </Reasoning>
+                        );
                       case "text":
                         return m.role === "assistant" ? (
                           <Streamdown key={`${m.id}-${i}`} isAnimating={status === "streaming" && m.id === messages[messages.length - 1]?.id}>

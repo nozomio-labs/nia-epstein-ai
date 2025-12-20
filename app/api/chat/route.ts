@@ -1,8 +1,9 @@
-import { convertToModelMessages, streamText, type UIMessage } from "ai";
+import { convertToModelMessages, streamText, stepCountIs, type UIMessage } from "ai";
 import { DEFAULT_MODEL } from "@/lib/constants";
 import { gateway } from "@/lib/gateway";
 import { niaChromiumTools } from "@/lib/nia-tools";
 
+export const runtime = "edge";
 export const maxDuration = 300;
 
 const CHROMIUM_SYSTEM_PROMPT = `You are **ChromAgent**, an AI assistant grounded in the **Chromium** codebase and its documentation (including design docs), via specialized tools.
@@ -39,12 +40,16 @@ The Chromium repo is split into 33 indexed subtrees. **ALWAYS specify 1-5 releva
 - **browseChromiumDocs** / **listChromiumDocsDirectory** / **readChromiumDoc**: Navigate docs.
 - **webSearch**: External web (use sparingly).
 
+## Search Limits
+- **Max 2 repos + 1 docs** per search call. Don't search more than this at once.
+
 ## How to Respond
-1. **Identify topic** → pick 1-5 relevant subtrees.
-2. **searchChromium** with \`subtrees: [...]\` to find relevant files/docs.
-3. **grepChromiumCode** with \`subtree: "..."\` to find exact symbols/definitions.
-4. **getSourceContent** to read full files and quote exact code.
-5. Cite file paths / doc URLs in your answer.
+1. **THINK before searching** — Chromium has many subtrees (third_party, chrome, base, net, content, etc.). Analyze the user's question to determine which subtree(s) are most relevant BEFORE making any search call. Don't blindly search — reason about where the answer is likely to live.
+2. **Identify topic** → pick 1-2 relevant subtrees (max 2 repos).
+3. **searchChromium** with \`subtrees: [...]\` to find relevant files/docs.
+4. **grepChromiumCode** with \`subtree: "..."\` to find exact symbols/definitions.
+5. **getSourceContent** to read full files and quote exact code.
+6. Cite file paths / doc URLs in your answer.
 
 ## Writing Style
 - Be technical, precise, and helpful.
@@ -62,15 +67,33 @@ export async function POST(req: Request) {
   
   const selectedModel = model || DEFAULT_MODEL;
 
+  // Enable extended thinking for Anthropic Claude models
+  const isAnthropic = selectedModel.startsWith("anthropic/");
+  const providerOptions = isAnthropic
+    ? {
+        anthropic: {
+          thinking: {
+            type: "enabled" as const,
+            budgetTokens: 10000,
+          },
+        },
+      }
+    : undefined;
+
   const result = streamText({
     model: gateway(selectedModel),
     system: CHROMIUM_SYSTEM_PROMPT,
     messages: convertToModelMessages(messages),
     tools: niaChromiumTools,
+    stopWhen: stepCountIs(20),
+    providerOptions,
+    maxOutputTokens: isAnthropic ? 16000 : undefined,
     onError: (e) => {
       console.error("Error while streaming.", e);
     },
   });
 
-  return result.toUIMessageStreamResponse();
+  return result.toUIMessageStreamResponse({
+    sendReasoning: true,
+  });
 }
