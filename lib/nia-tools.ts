@@ -18,7 +18,7 @@ const log = {
   response: (data: unknown) => {
     const preview = JSON.stringify(data, null, 2);
     const lines = preview.split('\n');
-    const truncated = lines.length > 20 
+    const truncated = lines.length > 20
       ? lines.slice(0, 20).join('\n') + '\n   ... (truncated)'
       : preview;
     console.log(`   Response:`, truncated.split('\n').join('\n   '));
@@ -53,412 +53,218 @@ function parseCsvEnv(value: string | undefined | null): string[] {
 }
 
 /**
- * Get Chromium documentation source IDs (UUIDs)
+ * Get Epstein archive repository sources (owner/repo/tree/branch/path format)
+ * Contains: emails, messages, flight logs, court documents, and other records
  */
-export function getChromiumDocsSources(): string[] {
-  return parseCsvEnv(process.env.CHROMIUM_DOCS_SOURCES);
+export function getEpsteinArchiveSources(): string[] {
+  return parseCsvEnv(process.env.NIA_EPSTEIN_ARCHIVE_SOURCES);
 }
 
 /**
- * Get Chromium repository sources (owner/repo paths)
+ * Get Epstein biographical sources
+ * Contains: biographical information, timeline, known associates, properties
  */
-export function getChromiumRepoSources(): string[] {
-  return parseCsvEnv(process.env.CHROMIUM_REPO_SOURCES);
+export function getEpsteinBiographicalSources(): string[] {
+  return parseCsvEnv(process.env.NIA_EPSTEIN_BIOGRAPHICAL_SOURCES);
 }
 
 /**
- * Get all Chromium sources for unified search
+ * Get all Epstein sources combined (archive + biographical)
  */
-export function getChromiumSources(): { docs: string[]; repos: string[] } {
-  const docs = getChromiumDocsSources();
-  const repos = getChromiumRepoSources();
-  
-  if (docs.length === 0 && repos.length === 0) {
-    throw new Error(
-      "No Chromium sources configured. Set CHROMIUM_DOCS_SOURCES and/or CHROMIUM_REPO_SOURCES in your .env"
-    );
+export function getAllEpsteinSources(): string[] {
+  return [...getEpsteinArchiveSources(), ...getEpsteinBiographicalSources()];
+}
+
+/**
+ * Get default archive repository source for browsing/listing/reading
+ */
+function getDefaultArchiveSource(): string {
+  const repos = getEpsteinArchiveSources();
+  if (repos.length === 0) {
+    throw new Error("NIA_EPSTEIN_ARCHIVE_SOURCES not configured");
   }
-  
-  return { docs, repos };
+  return repos[0]!;
 }
 
 /**
- * Get default doc source ID for browsing/listing/reading
+ * Get default biographical repository source
  */
-function getDefaultDocSourceId(): string {
-  const docs = getChromiumDocsSources();
-  if (docs.length === 0) {
-    throw new Error("CHROMIUM_DOCS_SOURCES not configured");
+function getDefaultBiographicalSource(): string {
+  const repos = getEpsteinBiographicalSources();
+  if (repos.length === 0) {
+    throw new Error("NIA_EPSTEIN_BIOGRAPHICAL_SOURCES not configured");
   }
-  return docs[0]!;
+  return repos[0]!;
 }
 
 
 /**
- * Semantic search over Chromium codebase + documentation
+ * Semantic search over all Epstein sources (archive + biographical)
  */
-export const searchChromium = tool({
-  description: `Search the Chromium codebase and documentation using semantic search.
+export const searchArchive = tool({
+  description: `Search all Epstein sources using semantic search.
 
-IMPORTANT: Specify relevant subtrees to avoid slow searches across all 33 repos!
+Searches across TWO repositories:
+1. **Archive** - emails, messages, flight logs, court documents, and other records
+2. **Biographical** - biographical information, timeline, known associates, properties
 
-Subtree guide:
-- base: core utilities, threading, CommandLine, logging
-- net: networking, HTTP, sockets, DNS, certificates  
-- content: multi-process arch, RenderFrame, browser/renderer
-- chrome: browser UI, settings, about:flags
-- components: autofill, sync, safe_browsing, shared code
-- ui: views, gfx, compositor, accessibility
-- gpu: GPU process, command buffer, ANGLE
-- mojo: IPC, mojom interfaces
-- services: network service, device service
-- cc: compositor, layers, animation
-- storage: IndexedDB, quota
-- extensions: extension APIs`,
+Use this to find:
+- Names of people (associates, victims, employees)
+- Dates and time periods
+- Locations (properties, travel destinations)
+- Events and meetings
+- Topics and subjects discussed in communications
+- Biographical details about Epstein's life and network`,
   inputSchema: z.object({
     query: z
       .string()
-      .describe("The search query - a question or topic to search for"),
-    subtrees: z
-      .array(z.string())
-      .optional()
-      .describe("Which subtrees to search (e.g., ['base', 'net', 'content']). If omitted, searches ALL repos (slow!). Pick 1-5 relevant ones."),
-    includeDocs: z
-      .boolean()
-      .default(true)
-      .describe("Include documentation sources in search (default true)"),
+      .describe("The search query - a question, name, date, or topic to search for"),
+    sourceType: z
+      .enum(["all", "archive", "biographical"])
+      .default("all")
+      .describe("Which sources to search: 'all' (default), 'archive' (documents only), or 'biographical' (biography only)"),
   }),
-  execute: async ({ query, subtrees, includeDocs }) => {
-    const allDocs = getChromiumDocsSources();
-    const allRepos = getChromiumRepoSources();
-    
-    // Filter repos to only the specified subtrees
-    let selectedRepos: string[] = [];
-    if (subtrees && subtrees.length > 0) {
-      selectedRepos = subtrees.map(s => `chromium/chromium/tree/main/${s}`);
-      // Validate they exist
-      const invalid = selectedRepos.filter(r => !allRepos.includes(r));
-      if (invalid.length > 0) {
-        const availableSubtrees = allRepos.map(r => r.split('/').pop()).join(', ');
-        throw new Error(`Invalid subtrees: ${invalid.map(r => r.split('/').pop()).join(', ')}. Available: ${availableSubtrees}`);
-      }
+  execute: async ({ query, sourceType }) => {
+    let repos: string[];
+    if (sourceType === "archive") {
+      repos = getEpsteinArchiveSources();
+    } else if (sourceType === "biographical") {
+      repos = getEpsteinBiographicalSources();
     } else {
-      selectedRepos = allRepos; // All if not specified
+      repos = getAllEpsteinSources();
     }
-    
-    const selectedDocs = includeDocs ? allDocs : [];
-    
-    log.tool("searchChromium", { 
-      query, 
-      subtrees: subtrees || "ALL", 
-      repoCount: selectedRepos.length, 
-      docCount: selectedDocs.length 
+
+    if (repos.length === 0) {
+      throw new Error(`No Epstein ${sourceType} sources configured. Check your .env`);
+    }
+
+    log.tool("searchArchive", {
+      query,
+      sourceType,
+      repoCount: repos.length
     });
-    
+
     const body: Record<string, unknown> = {
       messages: [{ role: "user", content: query }],
-      search_mode: selectedDocs.length > 0 && selectedRepos.length > 0 ? "unified" 
-                  : selectedRepos.length > 0 ? "repositories" 
-                  : "sources",
+      search_mode: "repositories",
       include_sources: true,
+      repositories: repos,
     };
-    
-    if (selectedDocs.length > 0) body.data_sources = selectedDocs;
-    if (selectedRepos.length > 0) body.repositories = selectedRepos;
-    
-    const response = await niaFetch("/query", {
+
+    const response = await niaFetch("/search/query", {
       method: "POST",
       body: JSON.stringify(body),
     });
 
     if (!response.ok) {
       const error = await response.text();
-      log.error("searchChromium", error);
+      log.error("searchArchive", error);
       throw new Error(`Nia API error: ${error}`);
     }
 
     const data = await response.json();
     const sourcesCount = data.sources?.length || 0;
-    log.success("searchChromium", `Found ${sourcesCount} sources (searched ${selectedRepos.length} repos, ${selectedDocs.length} docs)`);
+    log.success("searchArchive", `Found ${sourcesCount} sources`);
     log.response(data);
     return data;
   },
 });
 
 /**
- * Get the tree structure of a Chromium documentation source
+ * Get the tree structure of the Epstein archive repository
  */
-export const browseChromiumDocs = tool({
+export const browseArchive = tool({
   description:
-    "Get the complete tree structure of an indexed Chromium documentation source. Use this to explore available docs pages and their organization.",
+    "Get the complete tree structure of the indexed Epstein archive. Use this to explore available documents and their organization.",
   inputSchema: z.object({
-    sourceId: z
+    repoId: z
       .string()
       .optional()
-      .describe("Optional: specific doc source UUID (defaults to first configured doc source)"),
+      .describe("Optional: specific repository ID (defaults to first configured source)"),
   }),
-  execute: async ({ sourceId }) => {
-    const resolvedSourceId = sourceId || getDefaultDocSourceId();
-    log.tool("browseChromiumDocs", { sourceId: resolvedSourceId });
-    const response = await niaFetch(`/data-sources/${resolvedSourceId}/tree`);
+  execute: async ({ repoId }) => {
+    const resolvedRepoId = repoId || getDefaultArchiveSource();
+    log.tool("browseArchive", { repoId: resolvedRepoId });
+    const response = await niaFetch(`/repositories/${encodeURIComponent(resolvedRepoId)}/tree`);
 
     if (!response.ok) {
       const error = await response.text();
-      log.error("browseChromiumDocs", error);
+      log.error("browseArchive", error);
       throw new Error(`Nia API error: ${error}`);
     }
 
     const data = await response.json();
     const result = {
       tree: data.tree_string,
-      pageCount: data.page_count,
-      baseUrl: data.base_url,
-      sourceId: resolvedSourceId,
+      fileCount: data.file_count,
+      repoId: resolvedRepoId,
     };
-    log.success("browseChromiumDocs", `Found ${result.pageCount} pages`);
+    log.success("browseArchive", `Found ${result.fileCount} files`);
     log.response(result);
     return result;
   },
 });
 
 /**
- * List content in a virtual directory for a Chromium documentation source
+ * Read the full content of a file from the Epstein archive
  */
-export const listChromiumDocsDirectory = tool({
+export const readArchiveDoc = tool({
   description:
-    "List content in a specific virtual directory path within an indexed Chromium documentation source. Use browseChromiumDocs first to discover paths.",
+    "Read the full content of a specific file by its path within the indexed Epstein archive. Use after searchArchive or browseArchive.",
   inputSchema: z.object({
     path: z
       .string()
-      .default("/")
-      .describe('Virtual path to list (e.g., "/" for root). Get paths from browseChromiumDocs.'),
-    sourceId: z
+      .describe('File path to read (e.g., "data/emails/2005-01-15.txt"). Get paths from browseArchive or search results.'),
+    repoId: z
       .string()
       .optional()
-      .describe("Optional: specific doc source UUID (defaults to first configured doc source)"),
+      .describe("Optional: specific repository ID (defaults to first configured source)"),
   }),
-  execute: async ({ path, sourceId }) => {
-    const resolvedSourceId = sourceId || getDefaultDocSourceId();
-    log.tool("listChromiumDocsDirectory", { path, sourceId: resolvedSourceId });
+  execute: async ({ path, repoId }) => {
+    const resolvedRepoId = repoId || getDefaultArchiveSource();
+    log.tool("readArchiveDoc", { path, repoId: resolvedRepoId });
     const params = new URLSearchParams({ path });
     const response = await niaFetch(
-      `/data-sources/${resolvedSourceId}/ls?${params.toString()}`
+      `/repositories/${encodeURIComponent(resolvedRepoId)}/content?${params.toString()}`
     );
 
     if (!response.ok) {
       const error = await response.text();
-      log.error("listChromiumDocsDirectory", error);
+      log.error("readArchiveDoc", error);
       throw new Error(`Nia API error: ${error}`);
     }
 
     const data = await response.json();
     const result = {
-      path: data.path,
-      directories: data.directories,
-      files: data.files,
-      total: data.total,
-      sourceId: resolvedSourceId,
-    };
-    log.success("listChromiumDocsDirectory", `Found ${result.total} items at ${path}`);
-    log.response(result);
-    return result;
-  },
-});
-
-/**
- * Read the full content of a document from a Chromium documentation source
- */
-export const readChromiumDoc = tool({
-  description:
-    "Read the full content of a specific document by its virtual path within an indexed Chromium documentation source. Use after searchChromium or browseChromiumDocs.",
-  inputSchema: z.object({
-    path: z
-      .string()
-      .describe('Virtual path to read (e.g., "/docs/something.md"). Get paths from browseChromiumDocs or listChromiumDocsDirectory.'),
-    sourceId: z
-      .string()
-      .optional()
-      .describe("Optional: specific doc source UUID (defaults to first configured doc source)"),
-  }),
-  execute: async ({ path, sourceId }) => {
-    const resolvedSourceId = sourceId || getDefaultDocSourceId();
-    log.tool("readChromiumDoc", { path, sourceId: resolvedSourceId });
-    const params = new URLSearchParams({ path });
-    const response = await niaFetch(
-      `/data-sources/${resolvedSourceId}/read?${params.toString()}`
-    );
-
-    if (!response.ok) {
-      const error = await response.text();
-      log.error("readChromiumDoc", error);
-      throw new Error(`Nia API error: ${error}`);
-    }
-
-    const data = await response.json();
-    const result = {
-      path: data.path,
-      url: data.url,
+      path: path,
       content: data.content,
-      sourceId: resolvedSourceId,
+      metadata: data.metadata,
+      repoId: resolvedRepoId,
     };
     const contentLength = result.content?.length || 0;
-    log.success("readChromiumDoc", `Read ${contentLength} chars from ${path}`);
-    console.log(`   URL: ${result.url}`);
+    log.success("readArchiveDoc", `Read ${contentLength} chars from ${path}`);
     return result;
   },
 });
 
 /**
- * Search documentation using regex pattern
+ * Search archive using regex pattern
  */
-export const grepChromiumDocs = tool({
+export const grepArchive = tool({
   description:
-    "Search indexed Chromium documentation using a regex pattern. Use this to find specific terms, identifiers, or text patterns. For code search, use searchChromium with searchMode='repositories'.",
+    "Search the indexed Epstein archive using a regex pattern. Use this to find exact names, email addresses, phone numbers, dates, or specific text patterns.",
   inputSchema: z.object({
     pattern: z
       .string()
-      .describe("Regex pattern to search for (e.g., 'RenderFrame.*Host')"),
-    path: z
-      .string()
-      .default("/")
-      .describe("Limit search to this virtual path prefix"),
-    sourceId: z
-      .string()
-      .optional()
-      .describe("Optional: specific doc source UUID (defaults to first configured doc source)"),
-    contextLines: z
-      .number()
-      .min(0)
-      .max(10)
-      .optional()
-      .describe("Lines before AND after each match (default: 3)"),
-    linesAfter: z
-      .number()
-      .min(0)
-      .max(20)
-      .optional()
-      .describe("Lines after each match (like grep -A). Overrides contextLines for after."),
-    linesBefore: z
-      .number()
-      .min(0)
-      .max(20)
-      .optional()
-      .describe("Lines before each match (like grep -B). Overrides contextLines for before."),
-    caseSensitive: z
-      .boolean()
-      .default(false)
-      .describe("Case-sensitive matching (default is case-insensitive)"),
-    wholeWord: z
-      .boolean()
-      .default(false)
-      .describe("Match whole words only"),
-    fixedString: z
-      .boolean()
-      .default(false)
-      .describe("Treat pattern as literal string, not regex"),
-    maxMatchesPerFile: z
-      .number()
-      .min(1)
-      .max(100)
-      .default(10)
-      .describe("Maximum matches to return per file"),
-    maxTotalMatches: z
-      .number()
-      .min(1)
-      .max(1000)
-      .default(100)
-      .describe("Maximum total matches to return"),
-    outputMode: z
-      .enum(["content", "files_with_matches", "count"])
-      .default("content")
-      .describe("Output format: content (matched lines), files_with_matches (file paths only), count (match counts)"),
-    highlight: z
-      .boolean()
-      .default(false)
-      .describe("Add >>markers<< around matched text in results"),
-  }),
-  execute: async ({ 
-    pattern, 
-    path, 
-    sourceId,
-    contextLines, 
-    linesAfter, 
-    linesBefore, 
-    caseSensitive, 
-    wholeWord, 
-    fixedString, 
-    maxMatchesPerFile, 
-    maxTotalMatches, 
-    outputMode, 
-    highlight 
-  }) => {
-    const resolvedSourceId = sourceId || getDefaultDocSourceId();
-    log.tool("grepChromiumDocs", { pattern, path, sourceId: resolvedSourceId, outputMode });
-    
-    // Build request body, only including defined values
-    const requestBody: Record<string, unknown> = {
-      pattern,
-      context_lines: contextLines ?? 3,
-    };
-    
-    if (path && path !== "/") requestBody.path = path;
-    if (linesAfter !== undefined) requestBody.A = linesAfter;
-    if (linesBefore !== undefined) requestBody.B = linesBefore;
-    if (caseSensitive !== undefined) requestBody.case_sensitive = caseSensitive;
-    if (wholeWord !== undefined) requestBody.whole_word = wholeWord;
-    if (fixedString !== undefined) requestBody.fixed_string = fixedString;
-    if (maxMatchesPerFile !== undefined) requestBody.max_matches_per_file = maxMatchesPerFile;
-    if (maxTotalMatches !== undefined) requestBody.max_total_matches = maxTotalMatches;
-    if (outputMode) requestBody.output_mode = outputMode;
-    if (highlight !== undefined) requestBody.highlight = highlight;
-    
-    const response = await niaFetch(`/data-sources/${resolvedSourceId}/grep`, {
-      method: "POST",
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      log.error("grepChromiumDocs", error);
-      throw new Error(`Nia API error: ${error}`);
-    }
-
-    const data = await response.json();
-    const result = {
-      matches: data.matches,
-      files: data.files,
-      counts: data.counts,
-      pattern: data.pattern,
-      pathFilter: data.path_filter,
-      totalMatches: data.total_matches,
-      filesSearched: data.files_searched,
-      sourceId: resolvedSourceId,
-    };
-    log.success("grepChromiumDocs", `Found ${result.totalMatches} matches in ${result.filesSearched} files`);
-    log.response(result);
-    return result;
-  },
-});
-
-/**
- * Search repository code with regex (code grep)
- * Uses /repositories/{repository_id}/grep endpoint
- */
-export const grepChromiumCode = tool({
-  description:
-    "Search indexed Chromium repository code using a regex pattern. Like Unix grep but for the codebase. Use this to find function definitions, class names, error strings, flags, GN targets, etc. IMPORTANT: Each Chromium subtree is indexed separately (base, chrome, content, etc). Specify the subtree you want to search.",
-  inputSchema: z.object({
-    pattern: z
-      .string()
-      .describe("Regex pattern to search for in code (e.g., 'RenderFrameHost::.*Create', 'BUILDFLAG\\(')"),
-    subtree: z
-      .string()
-      .optional()
-      .describe("Which Chromium subtree to search (e.g., 'base', 'chrome', 'content', 'components', 'net', 'ui', 'gpu', 'mojo', 'ipc', 'services', etc). Defaults to 'base'."),
+      .describe("Regex pattern to search for (e.g., 'Bill Clinton', '@gmail.com', '2005-.*')"),
     path: z
       .string()
       .default("")
-      .describe("Limit search to files with this path prefix within the subtree"),
+      .describe("Limit search to files with this path prefix"),
+    repoId: z
+      .string()
+      .optional()
+      .describe("Optional: specific repository ID (defaults to first configured source)"),
     contextLines: z
       .number()
       .min(0)
@@ -524,8 +330,8 @@ export const grepChromiumCode = tool({
   }),
   execute: async ({
     pattern,
-    subtree,
     path,
+    repoId,
     contextLines,
     linesAfter,
     linesBefore,
@@ -540,26 +346,15 @@ export const grepChromiumCode = tool({
     groupByFile,
     exhaustive,
   }) => {
-    // Build the full repository path: chromium/chromium/tree/main/{subtree}
-    const resolvedSubtree = subtree || "base";
-    const repoId = `chromium/chromium/tree/main/${resolvedSubtree}`;
-    
-    // Verify this subtree is in our configured sources
-    const repos = getChromiumRepoSources();
-    if (repos.length > 0 && !repos.includes(repoId)) {
-      const availableSubtrees = repos.map(r => r.split('/').pop()).join(', ');
-      throw new Error(`Subtree '${resolvedSubtree}' not found. Available: ${availableSubtrees}`);
-    }
+    const resolvedRepoId = repoId || getDefaultArchiveSource();
+    log.tool("grepArchive", { pattern, path, repoId: resolvedRepoId, outputMode, exhaustive });
 
-    log.tool("grepChromiumCode", { pattern, subtree: resolvedSubtree, path, exhaustive, outputMode });
-    
     // Build request body, only including defined values
     const requestBody: Record<string, unknown> = {
       pattern,
       context_lines: contextLines ?? 3,
     };
-    
-    // Only add optional fields if they have values
+
     if (path) requestBody.path = path;
     if (linesAfter !== undefined) requestBody.A = linesAfter;
     if (linesBefore !== undefined) requestBody.B = linesBefore;
@@ -573,15 +368,15 @@ export const grepChromiumCode = tool({
     if (includeLineNumbers !== undefined) requestBody.include_line_numbers = includeLineNumbers;
     if (groupByFile !== undefined) requestBody.group_by_file = groupByFile;
     if (exhaustive !== undefined) requestBody.exhaustive = exhaustive;
-    
-    const response = await niaFetch(`/repositories/${encodeURIComponent(repoId)}/grep`, {
+
+    const response = await niaFetch(`/repositories/${encodeURIComponent(resolvedRepoId)}/grep`, {
       method: "POST",
       body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
       const error = await response.text();
-      log.error("grepChromiumCode", error);
+      log.error("grepArchive", error);
       throw new Error(`Nia API error: ${error}`);
     }
 
@@ -597,10 +392,9 @@ export const grepChromiumCode = tool({
       filesWithMatches: data.files_with_matches,
       truncated: data.truncated,
       options: data.options,
-      subtree: resolvedSubtree,
-      repositoryId: repoId,
+      repoId: resolvedRepoId,
     };
-    log.success("grepChromiumCode", `Found ${result.totalMatches} matches in ${result.filesWithMatches || 0} files (subtree: ${resolvedSubtree})`);
+    log.success("grepArchive", `Found ${result.totalMatches} matches in ${result.filesWithMatches || result.filesSearched} files`);
     log.response(result);
     return result;
   },
@@ -611,7 +405,7 @@ export const grepChromiumCode = tool({
  */
 export const webSearch = tool({
   description:
-    "Search the web for information not available in your indexed Chromium sources. Use sparingly - prefer searchChromium first.",
+    "Search the web for additional context not available in the indexed Epstein archive. Use sparingly - prefer searchArchive first.",
   inputSchema: z.object({
     query: z.string().describe("Search query"),
     numResults: z
@@ -624,15 +418,25 @@ export const webSearch = tool({
       .enum(["github", "company", "research", "news", "tweet", "pdf", "blog"])
       .optional()
       .describe("Filter by content category"),
+    daysBack: z
+      .number()
+      .optional()
+      .describe("Limit results to the last N days (recency filter)"),
+    findSimilarTo: z
+      .string()
+      .optional()
+      .describe("URL to find similar content to"),
   }),
-  execute: async ({ query, numResults, category }) => {
-    log.tool("webSearch", { query, numResults, category });
-    const response = await niaFetch("/web-search", {
+  execute: async ({ query, numResults, category, daysBack, findSimilarTo }) => {
+    log.tool("webSearch", { query, numResults, category, daysBack, findSimilarTo });
+    const response = await niaFetch("/search/web", {
       method: "POST",
       body: JSON.stringify({
         query,
         num_results: numResults,
         ...(category && { category }),
+        ...(daysBack !== undefined && { days_back: daysBack }),
+        ...(findSimilarTo && { find_similar_to: findSimilarTo }),
       }),
     });
 
@@ -643,7 +447,7 @@ export const webSearch = tool({
     }
 
     const data = await response.json();
-    const resultsCount = (data.github_repos?.length || 0) + (data.documentation?.length || 0) + (data.general?.length || 0);
+    const resultsCount = (data.github_repos?.length || 0) + (data.documentation?.length || 0) + (data.other_content?.length || 0);
     log.success("webSearch", `Found ${resultsCount} web results`);
     log.response(data);
     return data;
@@ -651,35 +455,28 @@ export const webSearch = tool({
 });
 
 /**
- * Get full source content by identifier (from search results)
+ * Get full file content by path (from search results)
  */
 export const getSourceContent = tool({
   description:
-    "Retrieve the full content of a specific source file or document from search results. Use this when you have a source identifier from searchChromium results.",
+    "Retrieve the full content of a specific file from the archive. Use this when you have a file path from searchArchive results.",
   inputSchema: z.object({
-    sourceType: z
-      .enum(["repository", "documentation"])
-      .describe("Type of source to retrieve"),
-    sourceIdentifier: z
+    path: z
       .string()
-      .describe(
-        "Identifier for the source. For repositories: 'owner/repo:path/to/file'. For documentation: the source URL or path"
-      ),
-    metadata: z
-      .record(z.unknown())
+      .describe("The file path (from search results or browseArchive)"),
+    repoId: z
+      .string()
       .optional()
-      .describe("Optional metadata from search results to help locate the source"),
+      .describe("Optional: specific repository ID (defaults to first configured source)"),
   }),
-  execute: async ({ sourceType, sourceIdentifier, metadata }) => {
-    log.tool("getSourceContent", { sourceType, sourceIdentifier });
-    const response = await niaFetch("/sources/content", {
-      method: "POST",
-      body: JSON.stringify({
-        source_type: sourceType,
-        source_identifier: sourceIdentifier,
-        ...(metadata && { metadata }),
-      }),
-    });
+  execute: async ({ path, repoId }) => {
+    const resolvedRepoId = repoId || getDefaultArchiveSource();
+    log.tool("getSourceContent", { path, repoId: resolvedRepoId });
+
+    const params = new URLSearchParams({ path });
+    const response = await niaFetch(
+      `/repositories/${encodeURIComponent(resolvedRepoId)}/content?${params.toString()}`
+    );
 
     if (!response.ok) {
       const error = await response.text();
@@ -689,7 +486,7 @@ export const getSourceContent = tool({
 
     const data = await response.json();
     const contentLength = data.content?.length || 0;
-    log.success("getSourceContent", `Retrieved ${contentLength} chars from ${sourceIdentifier}`);
+    log.success("getSourceContent", `Retrieved ${contentLength} chars from ${path}`);
     return {
       success: data.success,
       content: data.content,
@@ -699,13 +496,11 @@ export const getSourceContent = tool({
 });
 
 // Export all tools as a single object for easy use
-export const niaChromiumTools = {
-  searchChromium,
-  browseChromiumDocs,
-  listChromiumDocsDirectory,
-  readChromiumDoc,
-  grepChromiumDocs,
-  grepChromiumCode,
+export const niaEpsteinTools = {
+  searchArchive,
+  browseArchive,
+  readArchiveDoc,
+  grepArchive,
   webSearch,
   getSourceContent,
 };

@@ -191,8 +191,8 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
   }
 
-  /* Subtle Chromium-ish background (soft blue glow + faint grid) */
-  .chromium-grid {
+  /* Subtle background (soft glow + faint grid) */
+  .archive-grid {
     background-image:
       radial-gradient(900px circle at 15% 10%, oklch(0.58 0.19 255 / 0.16), transparent 55%),
       radial-gradient(700px circle at 85% 25%, oklch(0.6 0.12 184.704 / 0.10), transparent 60%),
@@ -201,7 +201,7 @@
     background-attachment: fixed;
   }
 
-  .dark .chromium-grid {
+  .dark .archive-grid {
     background-image:
       radial-gradient(900px circle at 15% 10%, oklch(0.72 0.16 255 / 0.14), transparent 55%),
       radial-gradient(700px circle at 85% 25%, oklch(0.696 0.17 162.48 / 0.10), transparent 60%),
@@ -264,6 +264,22 @@
       filter: blur(0);
     }
   }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0) rotate(0deg);
+    }
+    25% {
+      transform: translateY(-8px) rotate(2deg);
+    }
+    75% {
+      transform: translateY(-4px) rotate(-2deg);
+    }
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
   
   @media (prefers-reduced-motion: reduce) {
     .animate-fade-in,
@@ -272,6 +288,9 @@
     .animate-scale-in,
     .animate-message-in {
       animation: fade-in 200ms ease-out;
+    }
+    .animate-float {
+      animation: none;
     }
   }
 }

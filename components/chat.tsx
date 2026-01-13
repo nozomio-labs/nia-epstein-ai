@@ -17,7 +17,6 @@ import {
   GithubIcon,
   FolderIcon,
   FolderTreeIcon,
-  CodeIcon,
 } from "lucide-react";
 import Image from "next/image";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -29,26 +28,25 @@ import { Streamdown } from "streamdown";
 import { DEFAULT_MODEL, type SupportedModel } from "@/lib/constants";
 import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
+import { SplashScreen } from "@/components/splash-screen";
 
 const toolIcons: Record<string, React.ReactNode> = {
-  searchChromium: <SearchIcon className="h-3 w-3" />,
-  browseChromiumDocs: <FolderTreeIcon className="h-3 w-3" />,
-  listChromiumDocsDirectory: <FolderIcon className="h-3 w-3" />,
-  readChromiumDoc: <FileTextIcon className="h-3 w-3" />,
-  grepChromiumDocs: <SearchIcon className="h-3 w-3" />,
-  grepChromiumCode: <CodeIcon className="h-3 w-3" />,
+  searchArchive: <SearchIcon className="h-3 w-3" />,
+  browseArchive: <FolderTreeIcon className="h-3 w-3" />,
+  listArchiveDirectory: <FolderIcon className="h-3 w-3" />,
+  readArchiveDoc: <FileTextIcon className="h-3 w-3" />,
+  grepArchive: <SearchIcon className="h-3 w-3" />,
   getSourceContent: <FileTextIcon className="h-3 w-3" />,
   webSearch: <GlobeIcon className="h-3 w-3" />,
 };
 
 const toolDisplayNames: Record<string, string> = {
-  searchChromium: "Searching Chromium",
-  browseChromiumDocs: "Browsing docs tree",
-  listChromiumDocsDirectory: "Listing directory",
-  readChromiumDoc: "Reading document",
-  grepChromiumDocs: "Pattern search docs",
-  grepChromiumCode: "Grep codebase",
-  getSourceContent: "Opening source",
+  searchArchive: "Searching archive",
+  browseArchive: "Browsing archive",
+  listArchiveDirectory: "Listing directory",
+  readArchiveDoc: "Reading document",
+  grepArchive: "Pattern search",
+  getSourceContent: "Opening document",
   webSearch: "Web search",
 };
 
@@ -152,6 +150,7 @@ export function Chat() {
   const [input, setInput] = useState("");
   const [selectedModel, setSelectedModel] = useState<SupportedModel>(DEFAULT_MODEL);
   const [feedbacks, setFeedbacks] = useState<Record<string, "like" | "dislike" | null>>({});
+  const [showSplash, setShowSplash] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -203,7 +202,9 @@ export function Chat() {
   };
 
   return (
-    <div className="relative flex flex-col h-[100dvh] overflow-hidden">
+    <>
+      {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
+      <div className="relative flex flex-col h-[100dvh] overflow-hidden">
       <FlickeringGrid
         className="absolute inset-0 z-0 pointer-events-none [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]"
         squareSize={4}
@@ -228,10 +229,10 @@ export function Chat() {
           className="h-10 w-10 md:h-9 md:w-9 shadow-border-small hover:shadow-border-medium bg-background/80 backdrop-blur-sm border-0 hover:bg-background active:scale-95 md:hover:scale-[1.02] transition-all duration-150 ease"
         >
           <a
-            href="https://github.com/nozomio-labs/chromium-agent-nia"
+            href="https://github.com/nozomio-labs/epstein-files"
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="ChromAgent repository"
+            aria-label="Epstein Files repository"
           >
             <GithubIcon className="h-4 w-4" />
           </a>
@@ -243,29 +244,30 @@ export function Chat() {
           <div className="w-full max-w-2xl text-center space-y-6 md:space-y-12">
             <div className="space-y-3 md:space-y-4">
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 animate-slide-up">
-                <Image
-                  src="/chromium.png"
-                  alt="Chromium"
-                  width={128}
-                  height={128}
-                  className="rounded-2xl shadow-lg w-14 h-14 md:w-16 md:h-16 object-contain bg-background/70 backdrop-blur-sm border border-border/50"
-                  priority
-                  quality={100}
-                />
                 <h1 className="text-2xl sm:text-3xl md:text-5xl tracking-tight text-foreground font-[family-name:var(--font-canela)]">
-                  ChromAgent
+                  Epstein Files
                 </h1>
                 <div className="relative group">
-                  <span className="text-[10px] text-muted-foreground/60 cursor-default">35 sources</span>
+                  <span className="text-[10px] text-muted-foreground/60 cursor-default">archive</span>
                   <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 w-64 p-2 rounded-lg bg-popover border border-border shadow-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50 text-left">
                     <p className="text-[10px] text-muted-foreground leading-relaxed">
-                      <span className="text-foreground/80">2 docs</span> + <span className="text-foreground/80">33 code subtrees</span>: base, net, content, chrome, components, ui, gpu, mojo, services, cc, storage, extensions...
+                      Indexed emails, messages, flight logs, court documents, and other records from the Epstein archive.
                     </p>
                   </div>
                 </div>
               </div>
+              <div className="animate-slide-up flex justify-center" style={{ animationDelay: '25ms' }}>
+                <Image 
+                  src="/epstein123.png" 
+                  alt="Epstein" 
+                  width={180} 
+                  height={180} 
+                  className="rounded-full"
+                  priority
+                />
+              </div>
               <p className="text-muted-foreground text-sm md:text-base animate-slide-up px-2" style={{ animationDelay: '50ms' }}>
-                Ask about Chromium&apos;s codebase and docs — grounded in indexed sources. Powered by{" "}
+                Search the Epstein archive — emails, messages, and documents. Powered by{" "}
                 <a
                   href="https://trynia.ai"
                   target="_blank"
@@ -274,16 +276,7 @@ export function Chat() {
                 >
                   Nia
                 </a>
-                . Use{" "}
-                <a
-                  href="https://trynia.ai"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline underline-offset-4 hover:text-foreground transition-colors"
-                >
-                  Nia MCP
-                </a>
-                {" "}to add this to your coding agent.
+                .
               </p>
             </div>
             <div className="w-full animate-slide-up" style={{ animationDelay: '100ms' }}>
@@ -292,7 +285,7 @@ export function Chat() {
                   <textarea
                     ref={textareaRef}
                     name="prompt"
-                    placeholder="Where is the network stack implemented (net/ vs services/network/)?"
+                    placeholder="Who visited Little St. James Island in 2005?"
                     onChange={(e) => setInput(e.target.value)}
                     value={input}
                     autoFocus
@@ -327,35 +320,35 @@ export function Chat() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3 text-xs md:text-sm animate-slide-up" style={{ animationDelay: '150ms' }}>
               <button
                 onClick={() => {
-                  setInput("How do I add a new command-line switch (where are flags defined and parsed)?");
+                  setInput("Who are the most frequently mentioned people in the archive?");
                 }}
                 className="p-3 rounded-xl text-left text-muted-foreground hover:text-foreground active:bg-muted/70 hover:bg-muted/50 transition-colors"
               >
-                &ldquo;How do I add a new command-line switch?&rdquo;
+                &ldquo;Most frequently mentioned people?&rdquo;
               </button>
               <button
                 onClick={() => {
-                  setInput("Where should a new feature flag live (base/feature_list.h vs content/)?");
+                  setInput("What flight records exist from 2002-2005?");
                 }}
                 className="p-3 rounded-xl text-left text-muted-foreground hover:text-foreground active:bg-muted/70 hover:bg-muted/50 transition-colors"
               >
-                &ldquo;Where do feature flags live?&rdquo;
+                &ldquo;Flight records from 2002-2005?&rdquo;
               </button>
               <button
                 onClick={() => {
-                  setInput("What is the high-level process model (browser, renderer, GPU) and where is it documented?");
+                  setInput("Find emails mentioning specific locations or properties");
                 }}
                 className="p-3 rounded-xl text-left text-muted-foreground hover:text-foreground active:bg-muted/70 hover:bg-muted/50 transition-colors"
               >
-                &ldquo;Chromium process model overview?&rdquo;
+                &ldquo;Emails about specific locations?&rdquo;
               </button>
               <button
                 onClick={() => {
-                  setInput("Given an error stack, how can I trace it to the owning component (example: net::ERR_*)?");
+                  setInput("What documents exist from court proceedings?");
                 }}
                 className="p-3 rounded-xl text-left text-muted-foreground hover:text-foreground active:bg-muted/70 hover:bg-muted/50 transition-colors"
               >
-                &ldquo;How do I trace net::ERR_* errors?&rdquo;
+                &ldquo;Court proceeding documents?&rdquo;
               </button>
             </div>
           </div>
@@ -423,7 +416,7 @@ export function Chat() {
                     <div className="mt-3 pt-3 border-t border-border/40 flex items-start gap-2 text-xs text-muted-foreground/70">
                        <div className="mt-1 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
                        <span>
-                         Grounded answers come from your indexed Chromium sources via <a href="https://trynia.ai" target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline transition-all">Nia</a>.
+                         Grounded answers come from indexed Epstein archive sources via <a href="https://trynia.ai" target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline transition-all">Nia</a>.
                        </span>
                     </div>
                     </>
@@ -524,5 +517,6 @@ export function Chat() {
         </footer>
       )}
     </div>
+    </>
   );
 }

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { Geist, Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
@@ -22,25 +22,26 @@ const canela = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "ChromAgent",
-  description: "Ask Chromium anything — an AI agent grounded in your indexed Chromium repository + documentation, powered by Nia",
+  title: "Epstein Files",
+  description: "Search the Epstein archive — an AI agent grounded in indexed emails, messages, and documents, powered by Nia",
   openGraph: {
-    title: "ChromAgent",
-    description: "Ask Chromium anything — an AI agent grounded in your indexed Chromium repository + documentation, powered by Nia",
+    title: "Epstein Files",
+    description: "Search the Epstein archive — an AI agent grounded in indexed emails, messages, and documents, powered by Nia",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ChromAgent",
-    description: "Ask Chromium anything — an AI agent grounded in your indexed Chromium repository + documentation, powered by Nia",
+    title: "Epstein Files",
+    description: "Search the Epstein archive — an AI agent grounded in indexed emails, messages, and documents, powered by Nia",
   },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-    viewportFit: "cover",
-  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
