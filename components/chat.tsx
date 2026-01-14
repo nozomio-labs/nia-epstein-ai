@@ -47,31 +47,6 @@ function isRetryableError(error: Error): boolean {
   );
 }
 
-// Sanitize filename for Anthropic API compatibility
-// Only allows: alphanumeric, whitespace, hyphens, parentheses, square brackets
-// No consecutive whitespace
-function sanitizeFileName(name: string): string {
-  // Get file extension
-  const lastDot = name.lastIndexOf('.');
-  const ext = lastDot > 0 ? name.slice(lastDot) : '';
-  const baseName = lastDot > 0 ? name.slice(0, lastDot) : name;
-  
-  // Replace invalid characters with hyphens, collapse multiple spaces/hyphens
-  const sanitized = baseName
-    .replace(/[^a-zA-Z0-9\s\-\(\)\[\]]/g, '-') // Replace invalid chars
-    .replace(/\s+/g, ' ') // Collapse multiple spaces
-    .replace(/-+/g, '-') // Collapse multiple hyphens
-    .trim();
-  
-  return sanitized + ext;
-}
-
-// Create sanitized File from original
-function createSanitizedFile(file: File): File {
-  const sanitizedName = sanitizeFileName(file.name);
-  return new File([file], sanitizedName, { type: file.type });
-}
-
 // Agent step progress component
 function AgentProgress({ 
   currentStep, 
@@ -260,13 +235,13 @@ export function Chat() {
       }
     },
     
-    onFinish: (message) => {
+    onFinish: ({ message }) => {
       // Reset retry count on success
       setRetryCount(0);
       // Reset agent progress
       setCurrentStep(0);
       setCurrentTool(null);
-      
+
       // Log completion for debugging
       console.log("Message completed:", {
         id: message?.id,
@@ -340,18 +315,12 @@ export function Chat() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() && !files?.length) return;
-    
-    // Sanitize filenames for Anthropic API compatibility
-    let sanitizedFiles: File[] | undefined;
-    if (files && files.length > 0) {
-      sanitizedFiles = Array.from(files).map(createSanitizedFile);
-    }
-    
+
     sendMessage(
-      { 
+      {
         text: input,
-        files: sanitizedFiles, // AI SDK auto-converts to data URLs for image/* and text/*
-      }, 
+        files, // AI SDK auto-converts to data URLs for image/* and text/*
+      },
       { body: { model: selectedModel } }
     );
     

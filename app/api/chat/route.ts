@@ -166,7 +166,5 @@ export async function POST(req: Request) {
 
   return result.toUIMessageStreamResponse({
     sendReasoning: true,
-    // Server-side message ID generation for consistency
-    messageIdGenerator: () => crypto.randomUUID(),
   });
 }
