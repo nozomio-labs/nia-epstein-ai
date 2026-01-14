@@ -69,10 +69,18 @@ export function getEpsteinBiographicalSources(): string[] {
 }
 
 /**
- * Get all Epstein sources combined (archive + biographical)
+ * Get Epstein 20K dataset sources
+ * Contains: 25K+ documents from House Oversight Committee Nov 2025 release (TEXT + OCR from images)
+ */
+export function getEpstein20kSources(): string[] {
+  return parseCsvEnv(process.env.NIA_EPSTEIN_20K_DATASET);
+}
+
+/**
+ * Get all Epstein sources combined (archive + biographical + 20k dataset)
  */
 export function getAllEpsteinSources(): string[] {
-  return [...getEpsteinArchiveSources(), ...getEpsteinBiographicalSources()];
+  return [...getEpsteinArchiveSources(), ...getEpsteinBiographicalSources(), ...getEpstein20kSources()];
 }
 
 /**
@@ -99,14 +107,15 @@ function getDefaultBiographicalSource(): string {
 
 
 /**
- * Semantic search over all Epstein sources (archive + biographical)
+ * Semantic search over all Epstein sources (archive + biographical + 20k dataset)
  */
 export const searchArchive = tool({
   description: `Search all Epstein sources using semantic search.
 
-Searches across TWO repositories:
+Searches across THREE repositories:
 1. **Archive** - emails, messages, flight logs, court documents, and other records
 2. **Biographical** - biographical information, timeline, known associates, properties
+3. **Dataset** - 25K+ documents from House Oversight Committee Nov 2025 release
 
 Use this to find:
 - Names of people (associates, victims, employees)
@@ -114,15 +123,16 @@ Use this to find:
 - Locations (properties, travel destinations)
 - Events and meetings
 - Topics and subjects discussed in communications
-- Biographical details about Epstein's life and network`,
+- Biographical details about Epstein's life and network
+- Official government-released documents`,
   inputSchema: z.object({
     query: z
       .string()
       .describe("The search query - a question, name, date, or topic to search for"),
     sourceType: z
-      .enum(["all", "archive", "biographical"])
+      .enum(["all", "archive", "biographical", "dataset"])
       .default("all")
-      .describe("Which sources to search: 'all' (default), 'archive' (documents only), or 'biographical' (biography only)"),
+      .describe("Which sources to search: 'all' (default), 'archive', 'biographical', or 'dataset' (House Oversight release)"),
   }),
   execute: async ({ query, sourceType }) => {
     let repos: string[];
@@ -130,6 +140,8 @@ Use this to find:
       repos = getEpsteinArchiveSources();
     } else if (sourceType === "biographical") {
       repos = getEpsteinBiographicalSources();
+    } else if (sourceType === "dataset") {
+      repos = getEpstein20kSources();
     } else {
       repos = getAllEpsteinSources();
     }
