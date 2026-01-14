@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-An AI agent that searches and analyzes indexed Jeffrey Epstein sources, powered by [Nia](https://trynia.ai). The agent searches across three indexed repositories: Archive (emails, messages, flight logs, court documents), Biographical (timeline, known associates, properties), and Dataset (25K+ documents from House Oversight Committee Nov 2025 release).
+An AI agent that searches and analyzes indexed Jeffrey Epstein sources, powered by [Nia](https://trynia.ai). The agent searches across two indexed repositories: Archive (emails, messages, flight logs, court documents) and Biographical (timeline, known associates, properties).
 
 ## Commands
 
@@ -42,7 +42,7 @@ bun run type-check # Run TypeScript type checking
 
 ### Nia Tools
 All tools interact with the Nia API (`https://apigcp.trynia.ai/v2`):
-- **searchArchive**: Semantic search across all sources (archive, biographical, dataset)
+- **searchArchive**: Semantic search across all sources (archive, biographical)
 - **browseArchive**: Get repository tree structure
 - **readArchiveDoc**: Read full document content by path
 - **grepArchive**: Regex pattern search with extensive options
@@ -55,7 +55,6 @@ NIA_API_KEY              # Nia API key
 AI_GATEWAY_API_KEY       # AI provider key for gateway
 NIA_EPSTEIN_ARCHIVE_SOURCES      # Indexed archive repository IDs
 NIA_EPSTEIN_BIOGRAPHICAL_SOURCES # Indexed biographical repository IDs
-NIA_EPSTEIN_20K_DATASET          # Indexed House Oversight dataset IDs
 ```
 
 ### Model Support

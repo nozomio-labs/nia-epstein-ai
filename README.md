@@ -4,11 +4,10 @@ AI agent that searches and analyzes indexed **Jeffrey Epstein** sources. Powered
 
 ## Data Sources
 
-The agent searches across three indexed repositories:
+The agent searches across two indexed repositories:
 
 1. **Archive** — Emails, messages, flight logs, court documents
 2. **Biographical** — Timeline, known associates, properties
-3. **Dataset** — 25K+ documents from [House Oversight Committee Nov 2025 release](https://oversight.house.gov/release/oversight-committee-releases-additional-epstein-estate-documents/) (text + OCR)
 
 ## Quick Start
 
@@ -18,7 +17,6 @@ The agent searches across three indexed repositories:
    - `AI_GATEWAY_API_KEY` - Your AI provider key
    - `NIA_EPSTEIN_ARCHIVE_SOURCES` - Indexed archive repository
    - `NIA_EPSTEIN_BIOGRAPHICAL_SOURCES` - Indexed biographical repository
-   - `NIA_EPSTEIN_20K_DATASET` - Indexed House Oversight dataset
 3. Install & run:
    ```bash
    bun install

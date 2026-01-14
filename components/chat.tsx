@@ -17,6 +17,10 @@ import {
   GithubIcon,
   FolderIcon,
   FolderTreeIcon,
+  PaperclipIcon,
+  XIcon,
+  ImageIcon,
+  Loader2Icon,
 } from "lucide-react";
 import Image from "next/image";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -29,6 +33,77 @@ import { DEFAULT_MODEL, type SupportedModel } from "@/lib/constants";
 import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
 import { SplashScreen } from "@/components/splash-screen";
+
+// Helper to check if an error is retryable
+function isRetryableError(error: Error): boolean {
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("timeout") ||
+    message.includes("network") ||
+    message.includes("rate limit") ||
+    message.includes("503") ||
+    message.includes("429") ||
+    message.includes("fetch failed")
+  );
+}
+
+// Sanitize filename for Anthropic API compatibility
+// Only allows: alphanumeric, whitespace, hyphens, parentheses, square brackets
+// No consecutive whitespace
+function sanitizeFileName(name: string): string {
+  // Get file extension
+  const lastDot = name.lastIndexOf('.');
+  const ext = lastDot > 0 ? name.slice(lastDot) : '';
+  const baseName = lastDot > 0 ? name.slice(0, lastDot) : name;
+  
+  // Replace invalid characters with hyphens, collapse multiple spaces/hyphens
+  const sanitized = baseName
+    .replace(/[^a-zA-Z0-9\s\-\(\)\[\]]/g, '-') // Replace invalid chars
+    .replace(/\s+/g, ' ') // Collapse multiple spaces
+    .replace(/-+/g, '-') // Collapse multiple hyphens
+    .trim();
+  
+  return sanitized + ext;
+}
+
+// Create sanitized File from original
+function createSanitizedFile(file: File): File {
+  const sanitizedName = sanitizeFileName(file.name);
+  return new File([file], sanitizedName, { type: file.type });
+}
+
+// Agent step progress component
+function AgentProgress({ 
+  currentStep, 
+  maxSteps, 
+  currentTool, 
+  onStop 
+}: { 
+  currentStep: number; 
+  maxSteps: number; 
+  currentTool: string | null;
+  onStop: () => void;
+}) {
+  if (currentStep === 0) return null;
+  
+  return (
+    <div className="flex items-center gap-2 text-xs text-muted-foreground px-4 py-2 bg-muted/30 rounded-lg">
+      <Loader2Icon className="h-3 w-3 animate-spin" />
+      <span className="font-medium">Step {currentStep}/{maxSteps}</span>
+      {currentTool && (
+        <span className="text-muted-foreground/60">({currentTool})</span>
+      )}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="ml-auto h-6 text-xs"
+        onClick={onStop}
+      >
+        Stop & Keep Results
+      </Button>
+    </div>
+  );
+}
 
 const toolIcons: Record<string, React.ReactNode> = {
   searchArchive: <SearchIcon className="h-3 w-3" />,
@@ -153,8 +228,79 @@ export function Chat() {
   const [showSplash, setShowSplash] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // File attachments state
+  const [files, setFiles] = useState<FileList | undefined>(undefined);
+  
+  // Retry state for error handling
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 3;
+  
+  // Agent step tracking
+  const [currentStep, setCurrentStep] = useState(0);
+  const [currentTool, setCurrentTool] = useState<string | null>(null);
+  const MAX_AGENT_STEPS = 20;
 
-  const { messages, error, sendMessage, regenerate, setMessages, stop, status } = useChat();
+  const { messages, error, sendMessage, regenerate, setMessages, stop, status } = useChat({
+    // Throttle updates to 50ms - reduces re-renders ~95% while maintaining smooth UX
+    experimental_throttle: 50,
+    
+    onError: (error) => {
+      console.error("Chat error:", error);
+      
+      // Auto-retry for transient errors with exponential backoff
+      if (retryCount < MAX_RETRIES && isRetryableError(error)) {
+        const delay = Math.pow(2, retryCount) * 1000;
+        console.log(`Retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+        setTimeout(() => {
+          setRetryCount((prev) => prev + 1);
+          regenerate();
+        }, delay);
+      }
+    },
+    
+    onFinish: (message) => {
+      // Reset retry count on success
+      setRetryCount(0);
+      // Reset agent progress
+      setCurrentStep(0);
+      setCurrentTool(null);
+      
+      // Log completion for debugging
+      console.log("Message completed:", {
+        id: message?.id,
+        partsCount: message?.parts?.length ?? 0,
+      });
+    },
+  });
+
+  // Track agent steps from tool invocations in messages
+  useEffect(() => {
+    if (status === "streaming" && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage?.role === "assistant" && lastMessage.parts) {
+        const toolParts = lastMessage.parts.filter((p) => 
+          p.type.startsWith("tool-")
+        );
+        setCurrentStep(toolParts.length);
+        
+        // Get the current/latest tool being executed
+        const lastToolPart = toolParts[toolParts.length - 1] as { 
+          type: string; 
+          toolName?: string;
+          state?: string;
+        } | undefined;
+        
+        if (lastToolPart && lastToolPart.state !== "output-available") {
+          const toolName = lastToolPart.toolName || lastToolPart.type.replace("tool-", "");
+          setCurrentTool(toolDisplayNames[toolName] || toolName);
+        } else {
+          setCurrentTool(null);
+        }
+      }
+    }
+  }, [messages, status]);
 
   const handleFeedback = (messageId: string, type: "like" | "dislike") => {
     setFeedbacks((prev) => ({
@@ -193,11 +339,43 @@ export function Chat() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
-    sendMessage({ text: input }, { body: { model: selectedModel } });
+    if (!input.trim() && !files?.length) return;
+    
+    // Sanitize filenames for Anthropic API compatibility
+    let sanitizedFiles: File[] | undefined;
+    if (files && files.length > 0) {
+      sanitizedFiles = Array.from(files).map(createSanitizedFile);
+    }
+    
+    sendMessage(
+      { 
+        text: input,
+        files: sanitizedFiles, // AI SDK auto-converts to data URLs for image/* and text/*
+      }, 
+      { body: { model: selectedModel } }
+    );
+    
     setInput("");
+    setFiles(undefined);
+    
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+  
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setFiles(e.target.files);
+    }
+  };
+  
+  const removeFiles = () => {
+    setFiles(undefined);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -282,6 +460,31 @@ export function Chat() {
             <div className="w-full animate-slide-up" style={{ animationDelay: '100ms' }}>
               <form onSubmit={handleSubmit}>
                 <div className="relative rounded-2xl bg-muted/50 dark:bg-muted/30 border border-border/50 shadow-sm hover:shadow-md focus-within:shadow-md focus-within:border-border transition-all duration-200">
+                  {/* File attachment preview */}
+                  {files && files.length > 0 && (
+                    <div className="px-4 pt-3 flex flex-wrap gap-2">
+                      {Array.from(files).map((file, index) => (
+                        <div 
+                          key={index}
+                          className="flex items-center gap-2 px-2 py-1 bg-muted rounded-lg text-xs"
+                        >
+                          {file.type.startsWith('image/') ? (
+                            <ImageIcon className="h-3 w-3 text-muted-foreground" />
+                          ) : (
+                            <FileTextIcon className="h-3 w-3 text-muted-foreground" />
+                          )}
+                          <span className="truncate max-w-[150px]">{file.name}</span>
+                          <button
+                            type="button"
+                            onClick={removeFiles}
+                            className="text-muted-foreground hover:text-foreground"
+                          >
+                            <XIcon className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <textarea
                     ref={textareaRef}
                     name="prompt"
@@ -290,7 +493,10 @@ export function Chat() {
                     value={input}
                     autoFocus
                     rows={1}
-                    className="w-full resize-none bg-transparent px-4 pt-4 pb-14 text-[16px] md:text-base placeholder:text-muted-foreground/50 focus:outline-none min-h-[56px] max-h-[200px]"
+                    className={cn(
+                      "w-full resize-none bg-transparent px-4 pb-14 text-[16px] md:text-base placeholder:text-muted-foreground/50 focus:outline-none min-h-[56px] max-h-[200px]",
+                      files && files.length > 0 ? "pt-2" : "pt-4"
+                    )}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
@@ -299,17 +505,37 @@ export function Chat() {
                     }}
                   />
                   <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
-                    <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
+                    <div className="flex items-center gap-1">
+                      <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        accept="image/*,text/*,.pdf,.txt,.md,.csv"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
+                        onClick={() => fileInputRef.current?.click()}
+                        title="Attach files"
+                      >
+                        <PaperclipIcon className="h-4 w-4" />
+                      </Button>
+                    </div>
                     <Button
                       type="submit"
                       size="icon"
                       className={cn(
                         "h-8 w-8 rounded-lg transition-all duration-200",
-                        input.trim() 
+                        (input.trim() || files?.length)
                           ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm" 
                           : "bg-muted text-muted-foreground cursor-not-allowed"
                       )}
-                      disabled={!input.trim()}
+                      disabled={!input.trim() && !files?.length}
                     >
                       <ArrowUpIcon className="h-4 w-4" />
                     </Button>
@@ -317,39 +543,41 @@ export function Chat() {
                 </div>
               </form>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3 text-xs md:text-sm animate-slide-up" style={{ animationDelay: '150ms' }}>
+            <div className="flex flex-col gap-2 md:gap-3 text-xs md:text-sm animate-slide-up" style={{ animationDelay: '150ms' }}>
               <button
                 onClick={() => {
-                  setInput("Who are the most frequently mentioned people in the archive?");
+                  setInput("Was Arlan, the founder of Nozomio, mentioned in Epstein files?");
                 }}
-                className="p-3 rounded-xl text-left text-muted-foreground hover:text-foreground active:bg-muted/70 hover:bg-muted/50 transition-colors"
+                className="p-3 rounded-xl text-center text-muted-foreground hover:text-foreground active:bg-muted/70 hover:bg-muted/50 transition-colors"
               >
-                &ldquo;Most frequently mentioned people?&rdquo;
+                &ldquo;Was Arlan (Nozomio founder) mentioned?&rdquo;
               </button>
-              <button
-                onClick={() => {
-                  setInput("What flight records exist from 2002-2005?");
-                }}
-                className="p-3 rounded-xl text-left text-muted-foreground hover:text-foreground active:bg-muted/70 hover:bg-muted/50 transition-colors"
-              >
-                &ldquo;Flight records from 2002-2005?&rdquo;
-              </button>
-              <button
-                onClick={() => {
-                  setInput("Find emails mentioning specific locations or properties");
-                }}
-                className="p-3 rounded-xl text-left text-muted-foreground hover:text-foreground active:bg-muted/70 hover:bg-muted/50 transition-colors"
-              >
-                &ldquo;Emails about specific locations?&rdquo;
-              </button>
-              <button
-                onClick={() => {
-                  setInput("What documents exist from court proceedings?");
-                }}
-                className="p-3 rounded-xl text-left text-muted-foreground hover:text-foreground active:bg-muted/70 hover:bg-muted/50 transition-colors"
-              >
-                &ldquo;Court proceeding documents?&rdquo;
-              </button>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3">
+                <button
+                  onClick={() => {
+                    setInput("Who are the most frequently mentioned people in the archive?");
+                  }}
+                  className="p-3 rounded-xl text-left text-muted-foreground hover:text-foreground active:bg-muted/70 hover:bg-muted/50 transition-colors"
+                >
+                  &ldquo;Most frequently mentioned people?&rdquo;
+                </button>
+                <button
+                  onClick={() => {
+                    setInput("What flight records exist from 2002-2005?");
+                  }}
+                  className="p-3 rounded-xl text-left text-muted-foreground hover:text-foreground active:bg-muted/70 hover:bg-muted/50 transition-colors"
+                >
+                  &ldquo;Flight records from 2002-2005?&rdquo;
+                </button>
+                <button
+                  onClick={() => {
+                    setInput("Find emails mentioning specific locations or properties");
+                  }}
+                  className="p-3 rounded-xl text-left text-muted-foreground hover:text-foreground active:bg-muted/70 hover:bg-muted/50 transition-colors"
+                >
+                  &ldquo;Emails about specific locations?&rdquo;
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -369,7 +597,7 @@ export function Chat() {
                     m.role === "assistant" && "max-w-[95%] md:max-w-[85%] text-foreground/90 leading-relaxed text-sm md:text-base"
                   )}
                 >
-                  {m.parts.map((part, i) => {
+                  {m.parts?.map((part, i) => {
                     switch (part.type) {
                       case "reasoning":
                         return (
@@ -389,6 +617,29 @@ export function Chat() {
                         ) : (
                           <div key={`${m.id}-${i}`}>{part.text}</div>
                         );
+                      case "file": {
+                        // Handle file attachments (images, etc.)
+                        const filePart = part as { type: "file"; url: string; mediaType?: string };
+                        if (filePart.mediaType?.startsWith("image/")) {
+                          // For data URLs from file uploads, we need to use img tag
+                          // as Next.js Image doesn't support data URLs directly
+                          return (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              key={`${m.id}-${i}`}
+                              src={filePart.url}
+                              alt="Attached image"
+                              className="max-w-[300px] rounded-lg my-2"
+                            />
+                          );
+                        }
+                        return (
+                          <div key={`${m.id}-${i}`} className="flex items-center gap-2 text-xs text-muted-foreground my-1">
+                            <FileTextIcon className="h-3 w-3" />
+                            <span>Attached file</span>
+                          </div>
+                        );
+                      }
                       default:
                         // Handle tool invocations
                         if (part.type.startsWith("tool-")) {
@@ -432,29 +683,98 @@ export function Chat() {
 
       {error && (
         <div className="max-w-4xl mx-auto w-full px-4 md:px-8 pb-4 animate-slide-down">
-          <Alert variant="destructive" className="flex flex-col items-end">
+          <Alert variant="destructive" className="flex flex-col gap-3">
             <div className="flex flex-row gap-2">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-              <AlertDescription className="dark:text-red-400 text-red-600">
+              <AlertDescription className="dark:text-red-400 text-red-600 flex-1">
                 {error.message || "An error occurred while generating the response."}
+                {retryCount > 0 && retryCount < MAX_RETRIES && (
+                  <span className="block text-xs mt-1 text-red-400/70">
+                    Auto-retrying... ({retryCount}/{MAX_RETRIES})
+                  </span>
+                )}
+                {retryCount >= MAX_RETRIES && (
+                  <span className="block text-xs mt-1 text-red-400/70">
+                    Max retries reached. Please try again manually.
+                  </span>
+                )}
               </AlertDescription>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="ml-auto transition-all duration-150 ease-out hover:scale-105"
-              onClick={() => regenerate()}
-            >
-              Retry
-            </Button>
+            <div className="flex gap-2 ml-auto">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="transition-all duration-150 ease-out hover:scale-105"
+                onClick={() => {
+                  setRetryCount(0);
+                  setMessages([]);
+                }}
+              >
+                Clear Chat
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="transition-all duration-150 ease-out hover:scale-105"
+                onClick={() => {
+                  setRetryCount(0);
+                  regenerate();
+                }}
+              >
+                Retry
+              </Button>
+            </div>
           </Alert>
         </div>
       )}
 
       {hasMessages && (
-        <div className="w-full max-w-4xl mx-auto px-4 md:px-8 pb-4 md:pb-6 pt-2">
+        <div className="w-full max-w-4xl mx-auto px-4 md:px-8 pb-4 md:pb-6 pt-2 space-y-2">
+          {/* Agent progress indicator */}
+          {status === "streaming" && currentStep > 0 && (
+            <AgentProgress
+              currentStep={currentStep}
+              maxSteps={MAX_AGENT_STEPS}
+              currentTool={currentTool}
+              onStop={stop}
+            />
+          )}
+          
+          {/* Retry indicator */}
+          {retryCount > 0 && status === "streaming" && (
+            <div className="flex items-center gap-2 text-xs text-amber-500 px-4 py-2 bg-amber-500/10 rounded-lg">
+              <Loader2Icon className="h-3 w-3 animate-spin" />
+              <span>Retry attempt {retryCount}/{MAX_RETRIES}...</span>
+            </div>
+          )}
+          
           <form onSubmit={handleSubmit}>
             <div className="relative rounded-2xl bg-muted/50 dark:bg-muted/30 border border-border/50 shadow-sm hover:shadow-md focus-within:shadow-md focus-within:border-border transition-all duration-200">
+              {/* File attachment preview */}
+              {files && files.length > 0 && (
+                <div className="px-4 pt-3 flex flex-wrap gap-2">
+                  {Array.from(files).map((file, index) => (
+                    <div 
+                      key={index}
+                      className="flex items-center gap-2 px-2 py-1 bg-muted rounded-lg text-xs"
+                    >
+                      {file.type.startsWith('image/') ? (
+                        <ImageIcon className="h-3 w-3 text-muted-foreground" />
+                      ) : (
+                        <FileTextIcon className="h-3 w-3 text-muted-foreground" />
+                      )}
+                      <span className="truncate max-w-[150px]">{file.name}</span>
+                      <button
+                        type="button"
+                        onClick={removeFiles}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <XIcon className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <textarea
                 ref={textareaRef}
                 name="prompt"
@@ -462,7 +782,10 @@ export function Chat() {
                 onChange={(e) => setInput(e.target.value)}
                 value={input}
                 rows={1}
-                className="w-full resize-none bg-transparent px-4 pt-3 pb-12 text-[16px] md:text-base placeholder:text-muted-foreground/50 focus:outline-none min-h-[52px] max-h-[200px]"
+                className={cn(
+                  "w-full resize-none bg-transparent px-4 pb-12 text-[16px] md:text-base placeholder:text-muted-foreground/50 focus:outline-none min-h-[52px] max-h-[200px]",
+                  files && files.length > 0 ? "pt-2" : "pt-3"
+                )}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -471,17 +794,29 @@ export function Chat() {
                 }}
               />
               <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
-                <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
+                <div className="flex items-center gap-1">
+                  <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
+                    onClick={() => fileInputRef.current?.click()}
+                    title="Attach files"
+                  >
+                    <PaperclipIcon className="h-4 w-4" />
+                  </Button>
+                </div>
                 <Button
                   type="submit"
                   size="icon"
                   className={cn(
                     "h-8 w-8 rounded-lg transition-all duration-200",
-                    input.trim() 
+                    (input.trim() || files?.length)
                       ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm" 
                       : "bg-muted text-muted-foreground cursor-not-allowed"
                   )}
-                  disabled={!input.trim()}
+                  disabled={!input.trim() && !files?.length}
                 >
                   <ArrowUpIcon className="h-4 w-4" />
                 </Button>
