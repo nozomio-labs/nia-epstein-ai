@@ -145,9 +145,9 @@ export async function POST(req: Request) {
       
       await trackUsage({
         model: selectedModel,
-        inputTokens: usage?.promptTokens ?? 0,
-        outputTokens: usage?.completionTokens ?? 0,
-        totalTokens: usage?.totalTokens ?? 0,
+        inputTokens: usage?.inputTokens ?? 0,
+        outputTokens: usage?.outputTokens ?? 0,
+        totalTokens: (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0),
         duration: Date.now() - startTime,
         finishReason: finishReason ?? "unknown",
         toolsUsed: uniqueTools,
