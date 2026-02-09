@@ -6,6 +6,41 @@ import { niaEpsteinTools } from "@/lib/nia-tools";
 export const runtime = "edge";
 export const maxDuration = 300;
 
+// --- Rate Limiter ---
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 10; // max requests per IP per window
+
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+// Clean up expired entries every 5 minutes to prevent memory leaks
+let lastCleanup = Date.now();
+function cleanupRateLimitMap() {
+  const now = Date.now();
+  if (now - lastCleanup < 5 * 60 * 1000) return;
+  lastCleanup = now;
+  for (const [key, value] of rateLimitMap) {
+    if (now > value.resetAt) rateLimitMap.delete(key);
+  }
+}
+
+function checkRateLimit(ip: string): { allowed: boolean; remaining: number; resetAt: number } {
+  cleanupRateLimitMap();
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return { allowed: true, remaining: MAX_REQUESTS_PER_WINDOW - 1, resetAt: now + RATE_LIMIT_WINDOW_MS };
+  }
+
+  if (entry.count >= MAX_REQUESTS_PER_WINDOW) {
+    return { allowed: false, remaining: 0, resetAt: entry.resetAt };
+  }
+
+  entry.count++;
+  return { allowed: true, remaining: MAX_REQUESTS_PER_WINDOW - entry.count, resetAt: entry.resetAt };
+}
+
 // Simple token usage logger (replace with your analytics/database in production)
 async function trackUsage(data: {
   model: string;
@@ -79,8 +114,30 @@ You MUST use tools to ground every response in the actual indexed sources. Do NO
 - If you cannot find information in the sources, state this clearly.`;
 
 export async function POST(req: Request) {
+  // Rate limit by IP
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    ?? req.headers.get("x-real-ip")
+    ?? "unknown";
+  const { allowed, remaining, resetAt } = checkRateLimit(ip);
+
+  if (!allowed) {
+    return new Response(
+      JSON.stringify({ error: "Rate limit exceeded. Please wait a moment before sending another message." }),
+      {
+        status: 429,
+        headers: {
+          "Content-Type": "application/json",
+          "X-RateLimit-Limit": String(MAX_REQUESTS_PER_WINDOW),
+          "X-RateLimit-Remaining": "0",
+          "X-RateLimit-Reset": String(Math.ceil(resetAt / 1000)),
+          "Retry-After": String(Math.ceil((resetAt - Date.now()) / 1000)),
+        },
+      }
+    );
+  }
+
   const { messages, model }: { messages: UIMessage[]; model?: string } = await req.json();
-  
+
   const selectedModel = model || DEFAULT_MODEL;
   const startTime = Date.now();
 
