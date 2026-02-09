@@ -118,7 +118,7 @@ export async function POST(req: Request) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
     ?? req.headers.get("x-real-ip")
     ?? "unknown";
-  const { allowed, remaining, resetAt } = checkRateLimit(ip);
+  const { allowed, resetAt } = checkRateLimit(ip);
 
   if (!allowed) {
     return new Response(
