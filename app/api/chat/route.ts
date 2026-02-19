@@ -1,5 +1,5 @@
 import { convertToModelMessages, streamText, stepCountIs, type UIMessage } from "ai";
-import { DEFAULT_MODEL } from "@/lib/constants";
+import { DEFAULT_MODEL, SUPPORTED_MODELS } from "@/lib/constants";
 import { gateway } from "@/lib/gateway";
 import { niaEpsteinTools } from "@/lib/nia-tools";
 
@@ -114,20 +114,6 @@ You MUST use tools to ground every response in the actual indexed sources. Do NO
 - If you cannot find information in the sources, state this clearly.`;
 
 export async function POST(req: Request) {
-  // SERVICE TEMPORARILY DISABLED — high demand
-  return new Response(
-    JSON.stringify({
-      error: "Service temporarily unavailable. We are experiencing very high demand and have paused the chat to manage costs. Please check back later.",
-    }),
-    {
-      status: 503,
-      headers: {
-        "Content-Type": "application/json",
-        "Retry-After": "3600",
-      },
-    }
-  );
-
   // Rate limit by IP
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
     ?? req.headers.get("x-real-ip")
@@ -152,7 +138,9 @@ export async function POST(req: Request) {
 
   const { messages, model }: { messages: UIMessage[]; model?: string } = await req.json();
 
-  const selectedModel = model || DEFAULT_MODEL;
+  const selectedModel = model && SUPPORTED_MODELS.includes(model as (typeof SUPPORTED_MODELS)[number])
+    ? (model as (typeof SUPPORTED_MODELS)[number])
+    : DEFAULT_MODEL;
   const startTime = Date.now();
 
   // Enable extended thinking for Anthropic Claude models
